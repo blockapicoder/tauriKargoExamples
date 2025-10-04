@@ -80,8 +80,7 @@ document.getElementById("descRight")!.textContent = personnages[1]
 
 // Démo: quelques messages initiaux
 messages = [
-    { from: "A", text: "Salut ! prêt·e à discuter ?", at: Date.now() - 60_000 },
-    { from: "B", text: "Toujours 😄 De quoi on parle ?", at: Date.now() - 40_000 },
+ 
 ];
 const messagesA: ChatMessage[] = [
     { role: "system", content: `tu est ${personnages[0]} et tu parle à  ${personnages[1]} , tu répond en une ligne` },
