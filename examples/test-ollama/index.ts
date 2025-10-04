@@ -1,127 +1,161 @@
+// ask-ollama-chat.ts
+// Remplace l'ancien "ask-ollama.ts" pour utiliser le mode CHAT d'Ollama (/api/chat)
+import {ChatMessage , chatOllama } from "./ollama"
+// --- Votre logique applicative (UI) ---
+const question =
+  "crée-moi un unique personnage de film fantastique en une seule ligne ; réponds en français et donne uniquement la description, sans baratin";
 
-// ask-ollama.ts
-// Run with: node --loader ts-node/esm ask-ollama.ts  (ou transpile avec tsc puis node)
+let personnages: string[] = [];
+const selectionnes = new Set<string>(); // <-- ensemble des personnages cochés
 
-// Si vous êtes sur Node <18, installez un polyfill fetch (node-fetch) et ajustez l'import.
+const messages: ChatMessage[] = [
+  { role: "system", content: "Tu es concis, tu réponds en une seule ligne, uniquement la description du personnage." },
+];
 
-type GenerateRequest = {
-    model: string;
-    prompt?: string;
-    stream?: boolean;
-    format?: string;
-    // options?: Record<string, any>; // décommentez si vous voulez personnaliser
-};
-
-async function askOllama(prompt: string, model = "gemma3:4b") {
-    const url = "http://localhost:11434/api/generate";
-
-    const body: GenerateRequest = {
-        model,
-        prompt,
-        stream: false, // réponse en une seule fois (facile à parser)
-        // format: "json" // optionnel — si vous attendez du JSON strict de la part du modèle
-    };
-
-    try {
-        const res = await fetch(url, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                // Pas d'auth par défaut pour une instance locale d'Ollama
-            },
-            body: JSON.stringify(body),
-        });
-
-        if (!res.ok) {
-            const text = await res.text();
-            throw new Error(`Ollama HTTP ${res.status}: ${text}`);
-        }
-
-        // La doc montre que la réponse non-streaming est un objet JSON contenant
-        // au moins les champs comme "model", "created_at", "response", "done", etc.
-        // On essaye donc d'extraire json.response.
-        const json = await res.json();
-
-        // Robustesse : différents endpoints/librairies renvoient parfois un champ différent.
-        const answer =
-            (json && (json.response ?? json.result ?? json.output ?? json.message ?? json.text)) ??
-            JSON.stringify(json);
-
-        console.log("== Réponse d'Ollama ==");
-        console.log(answer);
-        return answer;
-    } catch (err) {
-        console.error("Erreur en appelant Ollama :", err);
-        throw err;
-    }
+// (optionnel) hook si tu as un bouton "Lancer conversation" à activer quand 2 sélectionnés
+function updateStartButtonState() {
+  const btn = document.getElementById("startChat") as HTMLButtonElement | null;
+  if (!btn) return;
+  const n = selectionnes.size;
+  btn.disabled = n !== 2;
+  btn.textContent = n === 2 ? "💬 Lancer conversation" : "💬 Lancer conversation (2 sélectionnés)";
 }
-const question = "creer moi un unique personnage de film fantastique en une seul ligne , repond en français et repond uniquement la description de se personnage , pas de baratin"
-let personnages: string[] = []
+
+// crée la coche et l'insère dans <li>
+function ajouterCoche(li: HTMLLIElement, descriptionPerso: string) {
+  const label = document.createElement("label");
+  label.style.display = "flex";
+  label.style.alignItems = "center";
+  label.style.gap = "8px";
+
+  const selectBox = document.createElement("input");
+  selectBox.type = "checkbox";
+  selectBox.className = "select";
+
+  selectBox.addEventListener("change", () => {
+    if (selectBox.checked) selectionnes.add(descriptionPerso);
+    else selectionnes.delete(descriptionPerso);
+    updateStartButtonState();
+  });
+
+  const descSpan = document.createElement("span");
+  descSpan.className = "desc";
+  // le texte sera renseigné ensuite (ou déjà présent) — on laisse comme conteneur
+  if (!descSpan.textContent) descSpan.textContent = descriptionPerso;
+
+  label.appendChild(selectBox);
+  label.appendChild(descSpan);
+
+  // Met la coche + texte au début du <li>
+  li.prepend(label);
+}
+
 async function load() {
-    try {
-        const r = await fetch("/api/file/personnages.json", {
-            method: "POST"
-            , cache: "no-cache"
-        })
-        personnages = await r.json()
-        for (const p of personnages) {
-            ajouterPersonnage(p)
-        }
-    } catch (e) {
-        console.log("pas de fichier")
-
+  try {
+    const r = await fetch("/api/file/personnages.json", { method: "POST", cache: "no-cache" });
+    personnages = await r.json();
+    for (const p of personnages) {
+      messages.push({ role: "user", content: question });
+      messages.push({ role: "assistant", content: p });
+      ajouterPersonnage(p);
     }
+  } catch {
+    console.log("pas de fichier");
+  }
 }
+
 function ajouterPersonnage(descriptionPerso: string) {
-    const li = document.createElement("li");
-    li.innerHTML = `
-      <span>${descriptionPerso}</span>
-    `;
-    const removeButton = document.createElement("button")
-    removeButton.setAttribute("class", "delete-btn")
-    removeButton.addEventListener("click", (btn) => {
-        personnages = personnages.filter((p) => p !== descriptionPerso)
-        removeButton.parentElement!.remove();
-    })
-    li.appendChild(removeButton)
+  const li = document.createElement("li");
 
-    
-    document.getElementById("list")!.appendChild(li);
+  // Ajoute la coche + texte
+  ajouterCoche(li, descriptionPerso);
+  // Met à jour le texte si besoin
+  const span = li.querySelector(".desc") as HTMLSpanElement;
+  if (span) span.textContent = descriptionPerso;
+
+  // Bouton supprimer
+  const removeButton = document.createElement("button");
+  removeButton.setAttribute("class", "delete-btn");
+  removeButton.textContent = "✕";
+  removeButton.addEventListener("click", () => {
+    personnages = personnages.filter((p) => p !== descriptionPerso);
+    selectionnes.delete(descriptionPerso); // retire de la sélection si présent
+    removeButton.parentElement!.remove();
+    updateStartButtonState();
+  });
+  li.appendChild(removeButton);
+
+  document.getElementById("list")!.appendChild(li);
 }
-function addItem() {
 
+async function addItem() {
+  const bouton = document.getElementById("addItem") as HTMLButtonElement;
+  const list = document.getElementById("list")!;
 
-    const bouton = document.getElementById("addItem") as HTMLButtonElement;
-    // Désactiver
-    bouton.disabled = true;
-    document.getElementById("addItem")!.setAttribute("enable", "false")
-    askOllama(question).then((rep) => {
-        const descriptionPerso = rep
-        ajouterPersonnage(descriptionPerso)
-        personnages.push(descriptionPerso)
-        bouton.disabled = false;
-    })
+  // li en direct pour le streaming
+  const li = document.createElement("li");
 
+  // coche + placeholder texte (sera rempli au fil du stream)
+  ajouterCoche(li, ""); // description remplie après
+  const live = li.querySelector(".desc") as HTMLSpanElement;
+  list.appendChild(li);
 
+  bouton.disabled = true;
+  try {
+    messages.push({ role: "user", content: question });
+
+    const answer = await chatOllama(messages, "gemma3-2060", {
+      stream: true,
+      onToken: (t) => { live.textContent = (live.textContent ?? "") + t; },
+    });
+
+    const descriptionPerso = answer.trim();
+    live.textContent = descriptionPerso; // version finale propre
+    personnages.push(descriptionPerso);
+    messages.push({ role: "assistant", content: descriptionPerso });
+
+    // recâble la coche avec la vraie valeur maintenant connue
+    const checkbox = li.querySelector('input.select') as HTMLInputElement | null;
+    if (checkbox) {
+      // retirer l’ancien listener anonyme n’est pas trivial, on remplace le label pour être net
+      const label = checkbox.closest("label")!;
+      label.remove();
+      ajouterCoche(li, descriptionPerso);
+    }
+
+    // Bouton supprimer
+    const removeButton = document.createElement("button");
+    removeButton.setAttribute("class", "delete-btn");
+    removeButton.textContent = "✕";
+    removeButton.addEventListener("click", () => {
+      personnages = personnages.filter((p) => p !== descriptionPerso);
+      selectionnes.delete(descriptionPerso);
+      removeButton.parentElement!.remove();
+      updateStartButtonState();
+    });
+    li.appendChild(removeButton);
+  } catch (err) {
+    console.error("Erreur en appelant Ollama :", err);
+    li.remove(); // rollback si erreur
+  } finally {
+    bouton.disabled = false;
+  }
 }
-document.getElementById("addItem")!.addEventListener("click", addItem)
+
+document.getElementById("addItem")!.addEventListener("click", addItem);
+
 async function save() {
-    await fetch("/api/file/personnages.json", {
-        method: "POST",
-        body: JSON.stringify(personnages, null, 2)
-    })
-
-
+  await fetch("/api/file/personnages.json", {
+    method: "POST",
+    body: JSON.stringify(personnages, null, 2),
+  });
 }
-document.getElementById("save")!.addEventListener("click", save)
-load().then(() => {
-    console.log("load")
-})
-/*
-const question = "creer moi un unique personnage de film fantastique en une seul ligne , repond en français et repond uniquement la description de se personnage , pas de baratin"
-document.body.append(question)
-document.body.appendChild(document.createElement("br"))
-askOllama(question).then(async (rep) => {
-    document.body.append(JSON.stringify(rep, null, 2))
-})
-*/
+document.getElementById("save")!.addEventListener("click", save);
+const btn = document.getElementById("startChat") as HTMLButtonElement | null;
+if (btn) {
+    btn.addEventListener("click",()=> {
+        sessionStorage.setItem("personnages",JSON.stringify([...selectionnes]))
+        window.location.href = "./chat.html"
+    })
+}
+load().then(() => console.log("load"));
