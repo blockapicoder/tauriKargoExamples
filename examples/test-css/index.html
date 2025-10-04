@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Launcher de tests – index.html</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Arial; }
+    header { padding: 12px; border-bottom: 1px solid currentColor; }
+    .toolbar { display: flex; gap: 8px; align-items: center; padding: 12px; border-bottom: 1px solid currentColor; }
+    button { padding: 8px 12px; border: 1px solid currentColor; background: transparent; cursor: pointer; }
+    #results { padding: 12px; white-space: pre-wrap; font-family: ui-monospace, Menlo, Consolas, monospace; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 style="margin:0;font-size:1.1rem;">Tests de layout (ouvre <code>index.html</code>)</h1>
+  </header>
+
+  <div class="toolbar">
+    <button id="run">Lancer tous les tests</button>
+    <span style="margin-left:auto;opacity:.75">Astuce : ajoute <code>?auto=1</code> à l’URL pour démarrer automatiquement</span>
+  </div>
+
+  <div id="results">Résultats :</div>
+
+  <!-- IMPORTANT : compiler d’abord tester.ts -> tester.js (ES modules) -->
+  <script type="module" src="index.ts"></script>
+</body>
+</html>
