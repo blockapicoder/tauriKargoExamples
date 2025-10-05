@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SPI — Sine-Product Interpolator (POU) — Definitions & Proofs</title>
+
+  <!-- Minimal styling (optional) -->
+  <style>
+    :root { --bg:#0b0f14; --fg:#e6edf3; --muted:#9fb0c0; --card:#111621; }
+    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; background:var(--bg); color:var(--fg); }
+    header { padding:14px 16px; border-bottom:1px solid #1f2633; background:linear-gradient(180deg,#0e141d,#0a0f16); position:sticky; top:0; }
+    h1 { margin:0; font-size:18px; letter-spacing:.3px; }
+    main { max-width: 900px; margin: 0 auto; padding: 18px; background: var(--card); border: 1px solid #1f2633; border-radius: 14px; margin-top: 16px; }
+    .muted { color: var(--muted); font-size: 13px; }
+  </style>
+
+  <!-- MathJax v3 -->
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" defer></script>
+</head>
+<body>
+  <header><h1>SPI — Sine-Product Interpolator (with POU)</h1></header>
+  <main>
+    <div id="tex-container" class="tex"></div>
+    <p class="muted">This page renders LaTeX via MathJax (client-side). Copy the content into your docs or site as needed.</p>
+  </main>
+
+  <script>
+    // LaTeX content (English) — definitions + positivity & cardinality proofs
+    const texSPI = String.raw`
+\[
+\textbf{Sine-Product Interpolator (SPI) with Partition-of-Unity (POU) Normalization}
+\]
+
+\[
+\begin{aligned}
+&\textbf{Data: } p_1,\dots,p_n\in\mathbb R^m \text{ pairwise distinct},\quad y_i\in\mathbb R,\quad
+d(a,b)=\|a-b\|^2.\\[2mm]
+&\textbf{Weights:}\quad
+w_i(p)=\prod_{\substack{j=1\\ j\ne i}}^{n}
+\sin\!\left(\pi\,\frac{d(p,p_j)}{d(p,p_j)+d(p_i,p_j)}\right).\\[2mm]
+&\textbf{Unnormalized form:}\quad
+F(p)=\sum_{i=1}^{n} y_i\, w_i(p).\\[2mm]
+&\textbf{POU-normalized form:}\quad
+\tilde F(p)=\dfrac{\sum_{i=1}^{n} y_i\, w_i(p)}{\sum_{i=1}^{n} w_i(p)}.
+\end{aligned}
+\]
+
+\[
+\textbf{Lemma (Positivity of weights and sum).}
+\]
+For every \(i\) and \(p\), \(w_i(p)\ge 0\); moreover \(w_i(p)>0\) if \(p\neq p_j\) for all \(j\).
+Consequently, \(\sum_{i=1}^n w_i(p)>0\) for all \(p\), and \(\sum_{i=1}^n w_i(p_i)=1\).
+
+\textit{Sketch.}
+For \(i\ne j\), \(d(p_i,p_j)>0\) so
+\[
+x=\frac{d(p,p_j)}{d(p,p_j)+d(p_i,p_j)}\in[0,1),
+\]
+hence \(\sin(\pi x)\ge 0\), with equality only when \(p=p_j\).
+Thus \(w_i(p)\ge 0\) and is \(>0\) whenever \(p\) is not any site \(p_j\).
+If \(p\neq p_j\ \forall j\), then all \(w_i(p)>0\Rightarrow \sum_i w_i(p)>0\).
+If \(p=p_i\), each factor in \(w_i\) equals \(\sin(\pi/2)=1\Rightarrow w_i(p_i)=1\);
+for \(k\ne i\) there is a factor \(\sin(0)=0\Rightarrow w_k(p_i)=0\).
+Hence \(\sum_i w_i(p_i)=1\). \(\square\)
+
+\[
+\textbf{Theorem (Cardinality).}
+\]
+For every \(i\), one has \(F(p_i)=y_i\) and \(\tilde F(p_i)=y_i\).
+
+\textit{Proof.}
+At \(p=p_i\), the previous result gives \(w_i(p_i)=1\) and \(w_{k\ne i}(p_i)=0\).
+Therefore \(F(p_i)=\sum_k y_k w_k(p_i)=y_i\).
+For the normalized form, \(\sum_k w_k(p_i)=1\) so
+\[
+\tilde F(p_i)=\frac{\sum_k y_k w_k(p_i)}{\sum_k w_k(p_i)}=\frac{y_i}{1}=y_i.
+\quad\square
+\]
+
+\[
+\textbf{Remarks.}
+\]
+\begin{itemize}
+\item \emph{Smoothness.} Each factor \(\sin(\pi x)\) is \(C^\infty\).
+At a node \(p_i\), \(\nabla w_i(p_i)=0\) (since \(\cos(\pi/2)=0\)), hence \(\nabla F(p_i)=0\).
+\item \emph{Geometric invariances.} Translations, rotations, and scalings preserve
+\(\frac{d(p,p_j)}{d(p,p_j)+d(p_i,p_j)}\), hence all weights and both \(F,\tilde F\).
+\item \emph{Stability by POU.} Normalization enforces \(\sum_i \frac{w_i}{\sum_k w_k}=1\),
+mitigating overshoot/undershoot, while preserving interpolation at the sites.
+\end{itemize}
+`;
+
+    function renderTex(containerId, tex) {
+      const el = document.getElementById(containerId);
+      if (!el) throw new Error(`Element #${containerId} not found`);
+      el.innerHTML = tex;
+      // Ask MathJax to typeset this container
+      if (window.MathJax && window.MathJax.typesetPromise) {
+        window.MathJax.typesetPromise([el]);
+      }
+    }
+
+    // Render once MathJax has loaded (defer)
+    document.addEventListener('DOMContentLoaded', () => {
+      renderTex('tex-container', texSPI);
+    });
+  </script>
+</body>
+</html>

@@ -60,6 +60,7 @@ function creerFunction(points: Point[]): (x: number, y: number) => number {
     return (x: number, y: number): number => {
         const p: THREE.Vector2 = new THREE.Vector2(x, y);
         let result = 0;
+        let s = 0
 
         for (let i = 0; i < points.length; i++) {
             let o = 1;
@@ -73,11 +74,12 @@ function creerFunction(points: Point[]): (x: number, y: number) => number {
             const W = o;
 
             const yi = points[i].y;
+            s+=W
 
             result = result + W * yi;
         }
 
-        return result;
+        return result/s;
     };
 }
 
