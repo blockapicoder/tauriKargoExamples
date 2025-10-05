@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SPI — N points (distance min) + grille</title>
+  <style>
+    :root { --bg:#0b0f14; --fg:#e6edf3; --muted:#9fb0c0; --card:#111621; --accent:#6ab0ff; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial; background:var(--bg); color:var(--fg); }
+    header { padding:14px 16px; border-bottom:1px solid #1f2633; background:linear-gradient(180deg,#0e141d,#0a0f16); position:sticky; top:0; }
+    h1 { margin:0; font-size:18px; letter-spacing:.3px; }
+    main { display:grid; grid-template-columns:340px 1fr; gap:16px; padding:16px; }
+    @media (max-width:1000px){ main { grid-template-columns:1fr; } }
+    .panel { background:var(--card); border:1px solid #1f2633; border-radius:14px; padding:14px; }
+    .panel h2 { margin:0 0 10px; font-size:15px; color:var(--muted); font-weight:600; }
+    .row { display:grid; grid-template-columns:1fr auto; align-items:center; gap:10px; margin-bottom:10px; }
+    label { font-size:13px; color:var(--muted); }
+    input[type="number"], select, input[type="file"] { width:100%; }
+    .btns { display:flex; gap:8px; flex-wrap:wrap; }
+    button { background:#1a2331; color:var(--fg); border:1px solid #2a3342; padding:8px 10px; border-radius:10px; cursor:pointer; font-weight:600; }
+    button.primary { background:#193654; border-color:#2e5e90; }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    .canvasWrap { display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start; }
+    .canvasCard { background:#0f1623; border:1px solid #1f2633; border-radius:14px; padding:10px; }
+    .canvasCard h3 { margin:0 0 8px; font-size:14px; color:var(--muted); }
+    canvas { width:100%; height:auto; image-rendering:pixelated; border-radius:10px; background:#0b0f14; }
+    .small { font-size:12px; color:var(--muted); }
+    .stat { display:inline-block; min-width:90px; }
+    .progress { height:6px; background:#202a39; border-radius:999px; overflow:hidden; margin-bottom:6px; }
+    .bar { height:100%; background:var(--accent); width:0%; transition:width .15s; }
+  </style>
+</head>
+<body>
+  <header><h1>SPI — N points (distance minimale) + grille rectangulaire</h1></header>
+
+  <main>
+    <section class="panel">
+      <h2>1) Image & réglages</h2>
+      <div class="row"><label>Image</label><input id="file" type="file" accept="image/*" /></div>
+      <div class="row"><label>Taille max (px)</label><input id="maxSize" type="number" value="1024" min="128" max="4096" step="64"></div>
+      <div class="row"><label>Normalisation (POU)</label>
+        <select id="pou"><option value="1">Oui</option><option value="0">Non</option></select>
+      </div>
+      <div class="row"><label>N points (échantillon)</label><input id="nPoints" type="number" value="3000" min="100" max="200000" step="100"></div>
+      <div class="row"><label>Distance minimale q (px)</label><input id="q" type="number" value="4" min="1" max="50"></div>
+      <div class="row"><label>k centres (par cellule)</label><input id="kneigh" type="number" value="16" min="4" max="64"></div>
+      <div class="row"><label>Rayon R (px)</label><input id="radius" type="number" value="16" min="6" max="128"></div>
+      <div class="row"><label>dx (px)</label><input id="dx" type="number" value="8" min="2" max="128"></div>
+      <div class="row"><label>dy (px)</label><input id="dy" type="number" value="8" min="2" max="128"></div>
+
+      <div class="btns">
+        <button id="sample" class="primary" disabled>1) Sélectionner N points</button>
+        <button id="reconstruct" disabled>2) Reconstruire (grille)</button>
+        <button id="stop" disabled>Stop</button>
+        <button id="download" disabled>Télécharger points</button>
+      </div>
+
+      <div style="margin-top:10px">
+        <div class="progress"><div class="bar" id="bar"></div></div>
+        <div class="small" id="status">Charge une image.</div>
+        <div class="small">
+          <span class="stat">Points: <span id="npts">0</span></span>
+          <span class="stat">PSNR: <span id="psnr">–</span></span>
+          <span class="stat">Progression: <span id="pct">0%</span></span>
+        </div>
+      </div>
+
+      <details>
+        <summary>Principe</summary>
+        <p>1) Choix aléatoire de <b>N</b> points avec <b>distance minimale q</b> (rejet si trop proches).<br>
+           2) Grille cible <code>dx×dy</code> : on évalue le SPI au centre de chaque cellule (k centres, rayon R) et on remplit le rectangle.</p>
+      </details>
+    </section>
+
+    <section class="panel">
+      <h2>2) Aperçu</h2>
+      <div class="canvasWrap">
+        <div class="canvasCard">
+          <h3>Original</h3>
+          <canvas id="orig"></canvas>
+        </div>
+        <div class="canvasCard">
+          <h3>Reconstruction (rectangles)</h3>
+          <canvas id="reco"></canvas>
+        </div>
+        <div class="canvasCard" style="grid-column: span 2;">
+          <h3>Points retenus (blanc)</h3>
+          <canvas id="mask"></canvas>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Charge le module compilé depuis spi_app.ts -->
+  <script type="module" src="./compression.ts"></script>
+</body>
+</html>
