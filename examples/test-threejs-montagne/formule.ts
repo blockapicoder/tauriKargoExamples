@@ -37,9 +37,9 @@ function setStaticFormula() {
   el.innerHTML = `
 \\[
 \\begin{aligned}
-&\\text{Avec } d(\\mathbf a,\\mathbf b)=\\lVert\\mathbf a-\\mathbf b\\rVert^{2},\\quad p_i=(x_i,y_i).\\\\[2mm]
-&F(x,y)=\\sum_{i=1}^{n} h_i\\,\\prod_{\\substack{j=1\\\\ j\\ne i}}^{n}
-\\sin\\!\\left(\\pi\\,\\frac{d\\big((x,y),\\,p_j\\big)}{d\\big((x,y),\\,p_j\\big)+d\\big(p_i,\\,p_j\\big)}\\right).
+&\\text{Avec } d(\\mathbf a,\\mathbf b)=\\lVert\\mathbf a-\\mathbf b\\rVert^{2}\\quad\\\\[2mm]
+&F(p)=\\sum_{i=1}^{n} h_i\\,\\prod_{\\substack{j=1\\\\ j\\ne i}}^{n}
+\\sin\\!\\left(\\pi\\,\\frac{d\\big(p,\\,p_j\\big)}{d\\big(p,\\,p_j\\big)+d\\big(p_i,\\,p_j\\big)}\\right).
 \\end{aligned}
 \\]`;
 }
