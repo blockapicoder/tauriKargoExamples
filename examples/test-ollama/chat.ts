@@ -70,7 +70,16 @@ function render() {
 // wiring
 
 
-
+function speak(text: string, { lang = "fr-FR", pitch = 1, rate = 1, volume = 1 } = {}) {
+    return new Promise<void>((resolve, reject) => {
+        speechSynthesis.cancel(); // évite les chevauchements
+        const u = new SpeechSynthesisUtterance(text);
+        Object.assign(u, { lang, pitch, rate, volume });
+        u.onend = () => resolve();
+        u.onerror = (e) => reject(e.error || e);
+        speechSynthesis.speak(u);
+    });
+}
 const personnagesSrc = sessionStorage.getItem("personnages")
 
 let personnages = JSON.parse(personnagesSrc!)
@@ -80,7 +89,7 @@ document.getElementById("descRight")!.textContent = personnages[1]
 
 // Démo: quelques messages initiaux
 messages = [
- 
+
 ];
 const messagesA: ChatMessage[] = [
     { role: "system", content: `tu est ${personnages[0]} et tu parle à  ${personnages[1]} , tu répond en une ligne` },
@@ -96,18 +105,22 @@ async function faireDialogue() {
         stream: false,
         onToken: (t) => { },
     });
+
     messagesA.push({ role: 'assistant', content: r })
     messages.push({ from: "A", text: r, at: idx })
     messagesB.push({ role: 'user', content: r })
-    r = await chatOllama(messagesB, "gemma3-2060", {
+    let r2 = await chatOllama(messagesB, "gemma3-2060", {
         stream: false,
         onToken: (t) => { },
     });
-    messagesB.push({ role: 'assistant', content: r })
-    messagesA.push({ role: "user", content: r })
-    messages.push({ from: "B", text: r, at: idx })
+
+    messagesB.push({ role: 'assistant', content: r2 })
+    messagesA.push({ role: "user", content: r2 })
+    messages.push({ from: "B", text: r2, at: idx })
     idx++
     render()
+    await speak(r)
+    await speak(r2)
 }
 async function step(n: number) {
     let tmpResolve = () => { }

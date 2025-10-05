@@ -1,10 +1,23 @@
 import * as THREE from 'three';
 import { ParametricGeometry } from 'three/examples/jsm/Addons.js';
-
-
+import { updateFormulaPanel } from './formule'
+updateFormulaPanel()
 const scene = new THREE.Scene();
+const ambient = new THREE.AmbientLight(0xffffff, 0.25);
+scene.add(ambient);
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+dirLight.position.set(5, 6, 4);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(1024, 1024);
+dirLight.shadow.camera.near = 0.5;
+dirLight.shadow.camera.far = 20;
+dirLight.shadow.normalBias = 0.02;
+scene.add(dirLight);
 
-
+// Point light colorée animée, pour des reflets sympas
+const pointLight = new THREE.PointLight(0x66ccff, 1.0, 20, 2);
+pointLight.position.set(-2, 2, -2);
+scene.add(pointLight);
 // Initialisation de la caméra
 const camera = new THREE.PerspectiveCamera(
     75,
@@ -82,15 +95,46 @@ let data: Point[] = [
     creerPoint(50, 50, 1.5),
     creerPoint(65, 40, -23.25),
 ];
+// Groupe pour les points de contrôle
+const meshAndControlPointsGroup = new THREE.Group();
+const controlPointsGroup = new THREE.Group();
+meshAndControlPointsGroup.add(controlPointsGroup)
+scene.add(meshAndControlPointsGroup);
+
+function drawControlPoints(points: Point[], selection: number) {
+    controlPointsGroup.clear();
+    const sphereGeom = new THREE.SphereGeometry(0.07, 16, 16);
+    const sphereMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    const sphereMatSelection = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    let idx = 0
+    for (const p of points) {
+        let m = sphereMat
+        if (idx === selection) {
+            m = sphereMatSelection
+        }
+        idx++
+        const s = new THREE.Mesh(sphereGeom, m);
+        // Même mapping que la surface :
+        // x' = x/10 - 5 ; z' = y/10 - 5 ; y' = F(x,y)/10  (ici y' = p.y/10)
+        const xScene = p.value.x / 10 - 5;
+        const zScene = p.value.y / 10 - 5;
+        const yScene = F(p.value.x, p.value.y) / 10; // <-- clé : hauteur depuis F
+        s.position.set(xScene, yScene, zScene);
+
+
+        controlPointsGroup.add(s);
+    }
+}
+
 let F = creerFunction(data);
 interface P {
     id: number, x: number, y: number, h: number
 }
-export function setPoints(ls: P[]) {
-    console.log(JSON.stringify(ls,null,2))
+export function setPoints(ls: P[],selection:number) {
+    //console.log(JSON.stringify(ls, null, 2))
     const newData: Point[] = ls.map((p) => {
         return {
-            value: new THREE.Vector2(p.x/10, p.y/10),
+            value: new THREE.Vector2(p.x / 10, p.y / 10),
             y: p.h
 
         }
@@ -106,18 +150,20 @@ export function setPoints(ls: P[]) {
             vec.setX(x / 10 - 5);
             vec.setZ(y / 10 - 5);
             vec.setY(z / 10);
-            return new THREE.Vector3(y, x, z);
+
         },
         50,
         50
     );
-    mesh.geometry = geometry;              // <-- remplacement
+    mesh.geometry = geometry;
+    drawControlPoints(newData,selection)
+    for (let p of newData) {
+        console.log(p.y, F(p.value.x, p.value.y));
+    }     // <-- remplacement
 
 
 }
-for (let p of data) {
-    console.log(p.y, F(p.value.x, p.value.y));
-}
+
 // Création de la géométrie
 let geometry = new ParametricGeometry(
     (u, v, vec) => {
@@ -128,49 +174,35 @@ let geometry = new ParametricGeometry(
         vec.setX(x / 10 - 5);
         vec.setZ(y / 10 - 5);
         vec.setY(z / 10);
-        return new THREE.Vector3(y, x, z);
+
     },
     50,
     50
 );
-
+const matMetal: THREE.MeshStandardMaterialParameters = {
+    roughness: 0.35,
+    metalness: 0.4,
+    color: new THREE.Color('#ff7f50'), // corail
+};
 // Matériel et maillage
 const material = new THREE.MeshBasicMaterial({
     color: 0x00ff00,
     wireframe: true,
 });
-let mesh = new THREE.Mesh(geometry, material);
+
+let mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial(matMetal));
+meshAndControlPointsGroup.add(mesh)
 // mesh.rotation.x += 0.01;
-mesh.rotation.x = -Math.PI - Math.PI / 10;
-scene.add(mesh);
-function replaceMesh() {
-    scene.remove(mesh);
-    F = creerFunction(data);
-    const oldRotation = mesh.rotation;
-    geometry = new ParametricGeometry(
-        (u, v, vec) => {
-            const x = 100 * u;
-            const y = 100 * v;
-            const z = F(x, y);
-            // console.log(x, y, z);
-            vec.setX(x / 10 - 5);
-            vec.setZ(y / 10 - 5);
-            vec.setY(z / 10);
-            return new THREE.Vector3(y, x, z);
-        },
-        50,
-        50
-    );
-    mesh = new THREE.Mesh(geometry, material);
-    // mesh.rotation.x += 0.01;
-    mesh.setRotationFromEuler(oldRotation);
-    scene.add(mesh);
-    console.log(...data.map((p) => ` ( ${p.y}, ${F(p.value.x, p.value.y)} ) `));
-}
+meshAndControlPointsGroup.rotation.x = -Math.PI - Math.PI / 10;
+
+const clock = new THREE.Clock();
 // Animation de la scène
 const animate = function () {
+    const t = clock.getElapsedTime();
     requestAnimationFrame(animate);
-
+    pointLight.position.x = Math.cos(t * 0.8) * 2.2;
+    pointLight.position.z = Math.sin(t * 0.8) * 2.2;
+    pointLight.position.y = 1.8 + Math.sin(t * 1.6) * 0.3;
     // Rotation du mesh
     // mesh.rotation.x += 0.01;
     //mesh.rotation.y += 0.01;
@@ -182,16 +214,16 @@ const animate = function () {
 document.addEventListener('keydown', function (event) {
     switch (event.key) {
         case 'ArrowUp':
-            mesh.rotation.x += 0.01;
+            meshAndControlPointsGroup.rotation.x += 0.01;
             break;
         case 'ArrowDown':
-            mesh.rotation.x -= 0.01;
+            meshAndControlPointsGroup.rotation.x -= 0.01;
             break;
         case 'ArrowLeft':
-            mesh.rotation.y -= 0.01;
+            meshAndControlPointsGroup.rotation.y -= 0.01;
             break;
         case 'ArrowRight':
-            mesh.rotation.y += 0.01;
+            meshAndControlPointsGroup.rotation.y += 0.01;
             break;
         case '+':
             camera.position.z += 1;
@@ -199,18 +231,8 @@ document.addEventListener('keydown', function (event) {
         case '-':
             camera.position.z -= 1;
             break;
-        case 'a':
-            level++;
-            replaceMesh();
-            console.log(level);
-            break;
-        case 'b':
-            if (level > 1) {
-                level--;
-                console.log(level);
-                replaceMesh();
-            }
-            break;
+
+
     }
 });
 window.addEventListener('resize', function () {

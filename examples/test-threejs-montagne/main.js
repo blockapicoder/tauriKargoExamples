@@ -41,6 +41,7 @@ const nextId = (() => { let n = 1; return () => n++; })();
 
 function getPos(canvas, evt) {
     const rect = canvas.getBoundingClientRect();
+
     return { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
 }
 function hitTest2D(x, y) {
@@ -107,52 +108,8 @@ function draw2D() {
     for (const p of points) drawPoint2D(p, p.id === selectedId);
 }
 
-// --- Dessin 3D (isométrique simplifiée) ---
-const GROUND_SIZE = 400;
-const HEIGHT_SCALE = 10;
-const ISO_SX = 0.6;
-const ISO_SY = 0.35;
-const COL_R = 8;
 
-function worldFrom2D(p) {
-    const gx = (p.x / Math.max(1, stage.clientWidth)) * GROUND_SIZE;
-    const gy = (p.y / Math.max(1, stage.clientHeight)) * GROUND_SIZE;
-    const hz = p.h * HEIGHT_SCALE;
-    return { gx, gy, hz };
-}
-function isoProject(gx, gy, hz, centerX, baseY) {
-    const sx = centerX + (gx - gy) * ISO_SX;
-    const sy = baseY + (gx + gy) * ISO_SY - hz;
-    return { sx, sy };
-}
-function drawGround3D() {
-    const w = view3d.clientWidth, h = view3d.clientHeight;
-    ctx3d.clearRect(0, 0, w, h);
-    ctx3d.lineWidth = 1;
-    ctx3d.strokeStyle = '#e9e9e9';
 
-    const cx = Math.round(w * 0.5);
-    const by = Math.round(h * 0.6);
-    const step = 50;
-
-    for (let t = 0; t <= GROUND_SIZE; t += step) {
-        let a = isoProject(t, 0, 0, cx, by);
-        let b = isoProject(t, GROUND_SIZE, 0, cx, by);
-        ctx3d.beginPath(); ctx3d.moveTo(a.sx, a.sy); ctx3d.lineTo(b.sx, b.sy); ctx3d.stroke();
-
-        a = isoProject(0, t, 0, cx, by);
-        b = isoProject(GROUND_SIZE, t, 0, cx, by);
-        ctx3d.beginPath(); ctx3d.moveTo(a.sx, a.sy); ctx3d.lineTo(b.sx, b.sy); ctx3d.stroke();
-    }
-
-    const A = isoProject(0, 0, 0, cx, by);
-    const B = isoProject(GROUND_SIZE, 0, 0, cx, by);
-    const C = isoProject(GROUND_SIZE, GROUND_SIZE, 0, cx, by);
-    const D = isoProject(0, GROUND_SIZE, 0, cx, by);
-    ctx3d.beginPath();
-    ctx3d.moveTo(A.sx, A.sy); ctx3d.lineTo(B.sx, B.sy); ctx3d.lineTo(C.sx, C.sy); ctx3d.lineTo(D.sx, D.sy); ctx3d.closePath();
-    ctx3d.strokeStyle = '#bbb'; ctx3d.stroke();
-}
 
 
 // --- Interactions 2D ---
@@ -165,13 +122,16 @@ stage.addEventListener('mousedown', (e) => {
         dragOffset.x = x - target.x;
         dragOffset.y = y - target.y;
         draw2D();
+
     } else {
         const p = { id: nextId(), x, y, h: 0 };
         points.push(p);
         selectedId = p.id;
         draw2D();
+
     }
-    setPoints(points)
+    setPoints(points, points.indexOf(points.find((e) => e.id === selectedId)))
+
 });
 stage.addEventListener('mousemove', (e) => {
     if (draggingId != null) {
@@ -181,7 +141,7 @@ stage.addEventListener('mousemove', (e) => {
         p.x = Math.round(x - dragOffset.x);
         p.y = Math.round(y - dragOffset.y);
         draw2D();
-        setPoints(points)
+        setPoints(points, points.indexOf(points.find((e) => e.id === selectedId)))
     }
 });
 window.addEventListener('mouseup', () => { draggingId = null; });
@@ -193,7 +153,7 @@ stage.addEventListener('dblclick', (e) => {
         points = points.filter(p => p.id !== target.id);
         if (selectedId === target.id) selectedId = null;
         draw2D();
-        setPoints(points)
+        setPoints(points, points.indexOf(points.find((e) => e.id === selectedId)))
     }
 });
 
@@ -210,7 +170,7 @@ window.addEventListener('keydown', (e) => {
         points = points.filter(pt => pt.id !== selectedId);
         selectedId = null; draw2D();
     }
-    setPoints(points)
+    setPoints(points, points.indexOf(points.find((e) => e.id === selectedId)))
 });
 
 // --- Molette pour ajuster la hauteur (Shift = ×5) ---
@@ -228,7 +188,7 @@ stage.addEventListener('wheel', (e) => {
     target.h += dir * mult * STEP;
     selectedId = target.id;
     draw2D();
-    setPoints(points)
+    setPoints(points, points.indexOf(points.find((e) => e.id === selectedId)))
 }, { passive: false });
 
 // --- Init ---
