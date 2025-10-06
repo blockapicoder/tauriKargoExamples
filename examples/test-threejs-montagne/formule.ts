@@ -33,15 +33,13 @@ function ensureMathJax(): Promise<void> {
 function setStaticFormula() {
   const el = document.getElementById('formule');
   if (!el) return;
-const latex = `\\[
-\\begin{aligned}
-&\\text{Avec } d(\\mathbf a,\\mathbf b)=\\lVert\\mathbf a-\\mathbf b\\rVert^{2},\\quad
-w_i(p)=\\prod_{\\substack{j=1\\\\ j\\ne i}}^{n}
-\\sin\\!\\left(\\pi\\,\\frac{d(p,p_j)}{d(p,p_j)+d(p_i,p_j)}\\right),\\\\[2mm]
-&\\tilde F(p)=\\frac{\\sum_{i=1}^{n} h_i\\, w_i(p)}{\\sum_{i=1}^{n} w_i(p)}.
-\\end{aligned}
-\\]`;
-  el.innerHTML = latex
+const latex = `\(\displaystyle d(\mathbf a,\mathbf b)=\lVert \mathbf a-\mathbf b\rVert^{2},\quad
+w_i(p)=\prod_{j=1,\, j\ne i}^{n}\sin\!\left(\pi\,\frac{d(p,p_j)}{d(p,p_j)+d(p_i,p_j)}\right),\quad
+\tilde F(p)=\frac{\sum_{i=1}^{n} h_i\, w_i(p)}{\sum_{i=1}^{n} w_i(p)}\)
+`;
+const latexInline = "\\(\\displaystyle d(\\mathbf a,\\mathbf b)=\\lVert \\mathbf a-\\mathbf b\\rVert^{2},\\quad w_i(p)=\\prod_{j=1,\\, j\\ne i}^{n}\\sin\\!\\left(\\pi\\,\\frac{d(p,p_j)}{d(p,p_j)+d(p_i,p_j)}\\right),\\quad \\tilde F(p)=\\frac{\\sum_{i=1}^{n} h_i\\, w_i(p)}{\\sum_{i=1}^{n} w_i(p)}\\)";
+
+  el.innerHTML = latexInline
 }
 
 export async function updateFormulaPanel() {
