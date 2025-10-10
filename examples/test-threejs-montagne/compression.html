@@ -1,98 +1,302 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
+  <title>SPI — Reconstruction d'image par cases (RGB)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SPI — N points (distance min) + grille</title>
   <style>
-    :root { --bg:#0b0f14; --fg:#e6edf3; --muted:#9fb0c0; --card:#111621; --accent:#6ab0ff; }
-    * { box-sizing: border-box; }
-    body { margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial; background:var(--bg); color:var(--fg); }
-    header { padding:14px 16px; border-bottom:1px solid #1f2633; background:linear-gradient(180deg,#0e141d,#0a0f16); position:sticky; top:0; }
-    h1 { margin:0; font-size:18px; letter-spacing:.3px; }
-    main { display:grid; grid-template-columns:340px 1fr; gap:16px; padding:16px; }
-    @media (max-width:1000px){ main { grid-template-columns:1fr; } }
-    .panel { background:var(--card); border:1px solid #1f2633; border-radius:14px; padding:14px; }
-    .panel h2 { margin:0 0 10px; font-size:15px; color:var(--muted); font-weight:600; }
-    .row { display:grid; grid-template-columns:1fr auto; align-items:center; gap:10px; margin-bottom:10px; }
-    label { font-size:13px; color:var(--muted); }
-    input[type="number"], select, input[type="file"] { width:100%; }
-    .btns { display:flex; gap:8px; flex-wrap:wrap; }
-    button { background:#1a2331; color:var(--fg); border:1px solid #2a3342; padding:8px 10px; border-radius:10px; cursor:pointer; font-weight:600; }
-    button.primary { background:#193654; border-color:#2e5e90; }
+    :root { font-family: system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+    body { margin: 16px; background:#0b0b10; color:#eaeaf0; }
+    h1 { font-size: 20px; margin: 0 0 12px; }
+    .row { display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; }
+    .card { background:#141622; border:1px solid #24273a; border-radius:12px; padding:12px; }
+    label { display:flex; flex-direction:column; font-size:12px; gap:6px; }
+    input[type="number"], input[type="file"] { background:#0f1120; color:#eaeaf0; border:1px solid #272b45; padding:8px; border-radius:8px; }
+    button { background:#2a2f55; color:white; padding:10px 14px; border:none; border-radius:10px; cursor:pointer; }
     button:disabled { opacity:.5; cursor:not-allowed; }
-    .canvasWrap { display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start; }
-    .canvasCard { background:#0f1623; border:1px solid #1f2633; border-radius:14px; padding:10px; }
-    .canvasCard h3 { margin:0 0 8px; font-size:14px; color:var(--muted); }
-    canvas { width:100%; height:auto; image-rendering:pixelated; border-radius:10px; background:#0b0f14; }
-    .small { font-size:12px; color:var(--muted); }
-    .stat { display:inline-block; min-width:90px; }
-    .progress { height:6px; background:#202a39; border-radius:999px; overflow:hidden; margin-bottom:6px; }
-    .bar { height:100%; background:var(--accent); width:0%; transition:width .15s; }
+    canvas { image-rendering: pixelated; background:#0a0a0a; border:1px solid #2b2f46; border-radius:8px; }
+    .small { font-size: 12px; opacity:.8; }
+    progress { width: 320px; height: 8px; }
+    .stats { display:flex; gap:12px; flex-wrap:wrap; }
+    .badge { background:#0f1120; border:1px solid #272b45; padding:6px 10px; border-radius:999px; font-size:12px; }
   </style>
 </head>
 <body>
-  <header><h1>SPI — N points (distance minimale) + grille rectangulaire</h1></header>
+  <h1>SPI — Reconstruction d'image par cases (RGB)</h1>
+  <div class="row card" style="gap:20px; align-items:center;">
+    <label>Image source
+      <input id="file" type="file" accept="image/*" />
+    </label>
+    <label>Largeur max (redimensionnement)
+      <input id="maxW" type="number" min="32" value="256" />
+    </label>
+    <label>DX (colonnes)
+      <input id="dx" type="number" min="1" value="16" />
+    </label>
+    <label>DY (lignes)
+      <input id="dy" type="number" min="1" value="16" />
+    </label>
+    <label>Points / case (K)
+      <input id="kpts" type="number" min="1" value="4" />
+    </label>
+    <label>Échantillons d'apprentissage / case (S)
+      <input id="samples" type="number" min="8" value="128" />
+    </label>
+    <label>Itérations d'optimisation (greedy)
+      <input id="iters" type="number" min="0" value="3" />
+    </label>
+    <div>
+      <button id="btnPrep" disabled>1) Préparer</button>
+      <button id="btnSelect" disabled>2) Sélectionner</button>
+      <button id="btnRecon" disabled>3) Reconstruire</button>
+    </div>
+  </div>
 
-  <main>
-    <section class="panel">
-      <h2>1) Image & réglages</h2>
-      <div class="row"><label>Image</label><input id="file" type="file" accept="image/*" /></div>
-      <div class="row"><label>Taille max (px)</label><input id="maxSize" type="number" value="1024" min="128" max="4096" step="64"></div>
-      <div class="row"><label>Normalisation (POU)</label>
-        <select id="pou"><option value="1">Oui</option><option value="0">Non</option></select>
-      </div>
-      <div class="row"><label>N points (échantillon)</label><input id="nPoints" type="number" value="3000" min="100" max="200000" step="100"></div>
-      <div class="row"><label>Distance minimale q (px)</label><input id="q" type="number" value="4" min="1" max="50"></div>
-      <div class="row"><label>k centres (par cellule)</label><input id="kneigh" type="number" value="16" min="4" max="64"></div>
-      <div class="row"><label>Rayon R (px)</label><input id="radius" type="number" value="16" min="6" max="128"></div>
-      <div class="row"><label>dx (px)</label><input id="dx" type="number" value="8" min="2" max="128"></div>
-      <div class="row"><label>dy (px)</label><input id="dy" type="number" value="8" min="2" max="128"></div>
+  <div class="row" style="margin-top:12px; gap:24px;">
+    <div class="card">
+      <div class="small">Original (évent. redimensionné)</div>
+      <canvas id="src" width="320" height="240"></canvas>
+    </div>
+    <div class="card">
+      <div class="small">Reconstruction SPI (par case)</div>
+      <canvas id="dst" width="320" height="240"></canvas>
+    </div>
+  </div>
 
-      <div class="btns">
-        <button id="sample" class="primary" disabled>1) Sélectionner N points</button>
-        <button id="reconstruct" disabled>2) Reconstruire (grille)</button>
-        <button id="stop" disabled>Stop</button>
-        <button id="download" disabled>Télécharger points</button>
-      </div>
+  <div class="row" style="margin-top:8px; align-items:center; gap:16px;">
+    <div class="small" id="info">Charge une image pour commencer.</div>
+    <progress id="prog" max="1" value="0" style="display:none;"></progress>
+  </div>
+  <div class="stats" id="stats" style="margin-top:6px; display:none;"></div>
 
-      <div style="margin-top:10px">
-        <div class="progress"><div class="bar" id="bar"></div></div>
-        <div class="small" id="status">Charge une image.</div>
-        <div class="small">
-          <span class="stat">Points: <span id="npts">0</span></span>
-          <span class="stat">PSNR: <span id="psnr">–</span></span>
-          <span class="stat">Progression: <span id="pct">0%</span></span>
-        </div>
-      </div>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const file = $("file"), maxW = $("maxW"), dxI=$("dx"), dyI=$("dy"), kI=$("kpts"), sI=$("samples"), itI=$("iters");
+  const btnPrep = $("btnPrep"), btnSelect=$("btnSelect"), btnRecon=$("btnRecon");
+  const srcC = $("src"), dstC=$("dst");
+  const srcX = srcC.getContext('2d');
+  const dstX = dstC.getContext('2d');
+  const info = $("info"), prog=$("prog"), stats=$("stats");
 
-      <details>
-        <summary>Principe</summary>
-        <p>1) Choix aléatoire de <b>N</b> points avec <b>distance minimale q</b> (rejet si trop proches).<br>
-           2) Grille cible <code>dx×dy</code> : on évalue le SPI au centre de chaque cellule (k centres, rayon R) et on remplit le rectangle.</p>
-      </details>
-    </section>
+  let W=0, H=0, DX=0, DY=0, cellW=0, cellH=0;
+  let R=null, G=null, B=null; // Float32Array size W*H, [0..1]
+  let cells = null; // DY x DX
 
-    <section class="panel">
-      <h2>2) Aperçu</h2>
-      <div class="canvasWrap">
-        <div class="canvasCard">
-          <h3>Original</h3>
-          <canvas id="orig"></canvas>
-        </div>
-        <div class="canvasCard">
-          <h3>Reconstruction (rectangles)</h3>
-          <canvas id="reco"></canvas>
-        </div>
-        <div class="canvasCard" style="grid-column: span 2;">
-          <h3>Points retenus (blanc)</h3>
-          <canvas id="mask"></canvas>
-        </div>
-      </div>
-    </section>
-  </main>
+  function setStatus(text){ info.textContent=text; }
+  function setBusy(b){ btnPrep.disabled=b; btnSelect.disabled=b || !cells; btnRecon.disabled=b || !cells; prog.style.display = b ? 'inline-block':'none'; }
 
-  <!-- Charge le module compilé depuis spi_app.ts -->
-  <script type="module" src="./compression.ts"></script>
+  // Chargement image
+  file.addEventListener('change', async () => {
+    const f = file.files?.[0]; if(!f) return;
+    const url = URL.createObjectURL(f);
+    const img = new Image();
+    img.onload = () => {
+      const scale = img.width > +maxW.value ? (+maxW.value)/img.width : 1;
+      W = Math.max(1, Math.floor(img.width*scale));
+      H = Math.max(1, Math.floor(img.height*scale));
+      srcC.width=W; srcC.height=H; dstC.width=W; dstC.height=H;
+      srcX.drawImage(img, 0,0,W,H);
+      const data = srcX.getImageData(0,0,W,H).data;
+      R = new Float32Array(W*H); G = new Float32Array(W*H); B = new Float32Array(W*H);
+      for(let i=0;i<W*H;i++){
+        R[i] = data[4*i]/255; G[i] = data[4*i+1]/255; B[i] = data[4*i+2]/255;
+      }
+      setStatus(`Image ${W}×${H} chargée. Choisis DX/DY puis “Préparer”.`);
+      btnPrep.disabled = false; btnSelect.disabled=true; btnRecon.disabled=true; stats.style.display='none'; stats.innerHTML='';
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  });
+
+  const idx = (x,y)=> y*W + x;
+  const clamp01 = (v)=> v<0?0:v>1?1:v;
+  function dist2D(ax, ay, bx, by){ const dx=ax-bx, dy=ay-by; return Math.hypot(dx,dy); }
+
+  // SPI (RGB): y = [r,g,b]
+  function makeSPI(points){
+    const n = points.length;
+    const m = Array.from({length:n}, ()=> new Float32Array(n));
+    for(let i=0;i<n;i++) for(let j=0;j<n;j++){
+      m[i][j] = dist2D(points[i].x[0], points[i].x[1], points[j].x[0], points[j].x[1]);
+    }
+    const TAU = 50, EPS = 1e-20;
+    return {
+      eval(x, y){
+        const dj = new Float32Array(n);
+        let best=-1, bestD=1e9;
+        for(let j=0;j<n;j++){
+          const d = dist2D(x,y, points[j].x[0], points[j].x[1]);
+          dj[j]=d; if(d===0) return points[j].y; if(d<bestD){bestD=d;best=j;}
+        }
+        let den=0, numR=0, numG=0, numB=0;
+        for(let i=0;i<n;i++){
+          let w=1;
+          for(let j=0;j<n;j++){
+            if(i===j) continue;
+            const d=dj[j], mij=m[i][j];
+            if (d > TAU*mij){ w=0; break; }
+            const r = d/(d+mij);
+            const s = Math.sin(Math.PI * r);
+            w *= s; if (w<EPS){ w=0; break; }
+          }
+          den += w; numR += w*points[i].y[0]; numG += w*points[i].y[1]; numB += w*points[i].y[2];
+        }
+        if(den!==0) return [numR/den, numG/den, numB/den];
+        const yb = points[best].y; return [yb[0], yb[1], yb[2]]; // fallback NN
+      },
+      m
+    };
+  }
+
+  let totalUsedPoints = 0; // K * DX * DY
+  let totalPixels = 0;     // W * H
+  let totalCandidates = 0; // S * DX * DY
+
+  // Préparer données et grille
+  btnPrep.addEventListener('click', () => {
+    if(!R){ setStatus('Charge d\'abord une image.'); return; }
+    totalUsedPoints = 0; totalPixels = 0; totalCandidates = 0; stats.style.display='none'; stats.innerHTML='';
+    setBusy(true);
+    setTimeout(() => {
+      DX = Math.max(1, +dxI.value|0); DY = Math.max(1, +dyI.value|0);
+      cellW = Math.floor(W / DX); cellH = Math.floor(H / DY);
+      const lastW = W - cellW*(DX-1), lastH = H - cellH*(DY-1);
+      cells = Array.from({length:DY}, (_, gy)=> Array.from({length:DX}, (_, gx)=> ({
+        x0: gx*cellW,
+        y0: gy*cellH,
+        cw: gx===DX-1 ? lastW : cellW,
+        ch: gy===DY-1 ? lastH : cellH,
+        P: [],
+        spi: null,
+      })));
+
+      // Redessine l'original + grille
+      srcX.putImageData(srcX.getImageData(0,0,W,H),0,0);
+      srcX.save(); srcX.strokeStyle = '#24d5ff99'; srcX.lineWidth = 1;
+      for(let gx=1; gx<DX; gx++){ const x = gx*cellW; srcX.beginPath(); srcX.moveTo(x,0); srcX.lineTo(x,H); srcX.stroke(); }
+      for(let gy=1; gy<DY; gy++){ const y = gy*cellH; srcX.beginPath(); srcX.moveTo(0,y); srcX.lineTo(W,y); srcX.stroke(); }
+      srcX.restore();
+
+      setStatus(`Grille ${DX}×${DY} prête. Étape 2: sélection locale (RGB).`);
+      btnSelect.disabled=false; btnRecon.disabled=true; setBusy(false);
+    }, 20);
+  });
+
+  function selectPointsForCell(cell, K, S){
+    const {x0,y0,cw,ch} = cell;
+    const samples = [];
+    for(let s=0;s<S;s++){
+      const x = x0 + Math.floor(Math.random()*cw);
+      const y = y0 + Math.floor(Math.random()*ch);
+      samples.push({
+        x: [(x - x0)/cw, (y - y0)/ch],
+        y: [R[idx(x,y)], G[idx(x,y)], B[idx(x,y)]]
+      });
+    }
+    // init K points: grille régulière
+    const pts = [];
+    const side = Math.ceil(Math.sqrt(K));
+    for(let gy=0; gy<side && pts.length<K; gy++){
+      for(let gx=0; gx<side && pts.length<K; gx++){
+        const px = (gx+0.5)/side, py=(gy+0.5)/side;
+        const ix = x0 + Math.min(cw-1, Math.floor(px*cw));
+        const iy = y0 + Math.min(ch-1, Math.floor(py*ch));
+        pts.push({ x:[px,py], y: [R[idx(ix,iy)], G[idx(ix,iy)], B[idx(ix,iy)]] });
+      }
+    }
+    let spi = makeSPI(pts);
+
+    function mse(){
+      let e=0;
+      for(const s of samples){
+        const v = spi.eval(s.x[0], s.x[1]);
+        const dr=v[0]-s.y[0], dg=v[1]-s.y[1], db=v[2]-s.y[2];
+        e += (dr*dr + dg*dg + db*db)/3;
+      }
+      return e / samples.length;
+    }
+
+    let bestE = mse();
+    const ITERS = +itI.value|0;
+    for(let it=0; it<ITERS; it++){
+      let improved=false;
+      for(let t=0; t<Math.min(S, 64); t++){
+        const cand = samples[Math.floor(Math.random()*samples.length)];
+        const replaceIdx = Math.floor(Math.random()*pts.length);
+        const saved = pts[replaceIdx];
+        pts[replaceIdx] = { x:[cand.x[0], cand.x[1]], y: [cand.y[0], cand.y[1], cand.y[2]] };
+        spi = makeSPI(pts);
+        const e = mse();
+        if (e + 1e-9 < bestE){ bestE = e; improved=true; }
+        else { pts[replaceIdx] = saved; spi = makeSPI(pts); }
+      }
+      if(!improved) break;
+    }
+
+    cell.P = pts; cell.spi = spi;
+  }
+
+  btnSelect.addEventListener('click', async () => {
+    if(!cells){ setStatus('Clique d\'abord sur Préparer.'); return; }
+    setBusy(true); prog.value=0; prog.max=DY*DX; prog.style.display='inline-block';
+    const K = Math.max(1, +kI.value|0); const S = Math.max(8, +sI.value|0);
+
+    totalUsedPoints = DX*DY*K; totalCandidates = DX*DY*S;
+
+    await new Promise(resolve => setTimeout(resolve, 10));
+    for(let gy=0; gy<DY; gy++){
+      for(let gx=0; gx<DX; gx++){
+        selectPointsForCell(cells[gy][gx], K, S);
+        prog.value += 1; if((gx&3)===0) await new Promise(r=>setTimeout(r,0));
+      }
+    }
+    setStatus('Points sélectionnés (RGB). Étape 3 : Reconstruction.');
+    btnRecon.disabled=false; setBusy(false);
+  });
+
+  btnRecon.addEventListener('click', async () => {
+    if(!cells){ setStatus('Prépare la grille et sélectionne les points d\'abord.'); return; }
+    setBusy(true); prog.value=0; prog.max=W*H; prog.style.display='inline-block';
+
+    totalPixels = W*H;
+    const out = dstX.createImageData(W,H);
+    const data = out.data;
+
+    for(let gy=0; gy<DY; gy++){
+      for(let gx=0; gx<DX; gx++){
+        const cell = cells[gy][gx];
+        const {x0,y0,cw,ch, spi} = cell;
+        for(let y=y0; y<y0+ch; y++){
+          for(let x=x0; x<x0+cw; x++){
+            const u = (x - x0)/cw, v=(y - y0)/ch;
+            const rgb = spi.eval(u,v);
+            const off = 4*idx(x,y);
+            data[off+0] = Math.round(clamp01(rgb[0])*255);
+            data[off+1] = Math.round(clamp01(rgb[1])*255);
+            data[off+2] = Math.round(clamp01(rgb[2])*255);
+            data[off+3] = 255;
+            prog.value += 1;
+          }
+        }
+        await new Promise(r=>setTimeout(r,0));
+      }
+    }
+
+    dstX.putImageData(out,0,0);
+
+    // Stats affichées: points utilisés / pixels totaux, et candidats
+    stats.style.display='flex';
+    stats.innerHTML = `
+      <span class="badge">Points utilisés (contrôle): <b>${totalUsedPoints.toLocaleString()}</b></span>
+      <span class="badge">Pixels reconstruits (total): <b>${totalPixels.toLocaleString()}</b></span>
+      <span class="badge">Candidats évalués (S×cases): <b>${totalCandidates.toLocaleString()}</b></span>
+    `;
+
+    setStatus('Reconstruction terminée (RGB). Ajuste DX/DY/K/S/itérations pour comparer.');
+    setBusy(false);
+  });
+})();
+</script>
 </body>
 </html>
