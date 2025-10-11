@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Voix "démon", "troll"… — Piper TTS (100% local)</title>
+  <style>
+    :root { --bg:#0b0d10; --panel:#111418; --soft:#1a1f25; --text:#e8eef5; --muted:#9fb0c2; --accent:#5cc8ff; --ok:#3ddc97; --err:#ff6b6b; --br:16px; }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0; background:linear-gradient(160deg,var(--bg),#0f1216 45%,#0a0c10); color:var(--text); font:16px/1.45 system-ui,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
+    .app{max-width:1100px; margin:0 auto; padding:24px}
+    h1{margin:0 0 .5rem 0}
+    .grid{display:grid; gap:16px; grid-template-columns: 1.1fr .9fr}
+    @media (max-width:980px){ .grid{grid-template-columns:1fr} }
+    .card{background:linear-gradient(180deg,var(--panel),var(--soft)); border:1px solid #141922; border-radius:var(--br); padding:16px; box-shadow:0 6px 24px rgba(0,0,0,.25)}
+    label{font-size:12px; color:var(--muted)}
+    textarea, input, select{width:100%; background:#0f141c; color:var(--text); border:1px solid #1e2632; border-radius:12px; padding:10px 12px; outline:none}
+    textarea{min-height:140px; resize:vertical}
+    button{ border:1px solid #1f2834; background:linear-gradient(180deg,#111923,#0d151e); color:var(--text); padding:10px 14px; border-radius:12px; cursor:pointer }
+    button.primary{border-color:#1a3a4d; background:linear-gradient(180deg,#0f2a3a,#0c2230); color:var(--accent)}
+    .row{display:flex; gap:12px; align-items:center; flex-wrap:wrap}
+    .slider{display:grid; grid-template-columns:130px 1fr 56px; gap:8px; align-items:center}
+    .preset{display:grid; grid-template-columns: 1fr 1fr; gap:8px}
+    .pill{display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:#0f151c; border:1px solid #1e2632; color:#9fb0c2}
+    .hint{color:#9fb0c2; font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>🦇 Générateur de voix fantastiques (démon, troll, robot…) – Piper (offline)</h1>
+    <p class="hint">Aucune API externe. Texte → <strong>Piper TTS (ONNX/WASM)</strong> → effets <em>WebAudio</em> (pitch, sous‑harmoniques, distorsion, chorus, réverb, filtre). Servez localement <code>node_modules</code> et vos modèles Piper (ONNX + JSON).</p>
+
+    <div class="grid">
+      <section class="card">
+        <label for="text">Texte</label>
+        <textarea id="text" placeholder="Écris quelque chose de maléfique…"></textarea>
+        <div class="row" style="margin-top:10px">
+          <div style="flex:1">
+            <label>Modèle Piper (.onnx)</label>
+            <input id="modelOnnx" value="/models/fr/model.onnx"/>
+          </div>
+          <div style="flex:1">
+            <label>Config Piper (.json)</label>
+            <input id="modelJson" value="/models/fr/model.json"/>
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div style="flex:1">
+            <label>Vitesse (tokens → durée)</label>
+            <input id="ttsRate" type="range" min="0.5" max="2.0" step="0.05" value="1.0" />
+          </div>
+          <div style="width:110px"><output id="ttsRateOut">1.00</output>×</div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button class="primary" id="btnSpeak">▶️ Lire</button>
+          <button id="btnStop">⏹️ Stop</button>
+          <span class="pill" id="status">moteur : non chargé</span>
+        </div>
+      </section>
+
+      <aside class="card">
+        <h3 style="margin-top:0">Préréglages de timbre</h3>
+        <div class="preset">
+          <button data-preset="demon">😈 Démon</button>
+          <button data-preset="troll">🪓 Troll</button>
+          <button data-preset="robot">🤖 Robot</button>
+          <button data-preset="ange">👼 Ange</button>
+          <button data-preset="chuchotement">🤫 Chuchotement</button>
+          <button data-preset="géant">🗿 Géant</button>
+          <button data-preset="gobelin">🧪 Gobelin</button>
+          <button data-preset="chipmunk">🐿️ Chipmunk</button>
+        </div>
+        <hr>
+        <h3>Réglages fins (FX)</h3>
+        <div class="slider"><label>Pitch playbackRate</label><input id="fxPitch" type="range" min="0.4" max="2.0" step="0.01" value="1"><output id="fxPitchOut">1.00</output></div>
+        <div class="slider"><label>Sub‑harmonique</label><input id="fxSub" type="range" min="0" max="1" step="0.01" value="0.0"><output id="fxSubOut">0.00</output></div>
+        <div class="slider"><label>Distorsion</label><input id="fxDrive" type="range" min="0" max="1" step="0.01" value="0.0"><output id="fxDriveOut">0.00</output></div>
+        <div class="slider"><label>Chorus (ms)</label><input id="fxChorus" type="range" min="0" max="25" step="0.1" value="0"><output id="fxChorusOut">0.0</output></div>
+        <div class="slider"><label>Réverb (sec)</label><input id="fxReverb" type="range" min="0" max="3" step="0.05" value="0"><output id="fxReverbOut">0.00</output></div>
+        <div class="slider"><label>LPF cutoff (Hz)</label><input id="fxLPF" type="range" min="200" max="8000" step="50" value="8000"><output id="fxLPFOut">8000</output></div>
+      </aside>
+    </div>
+  </div>
+
+  <script type="module">
+  // --- Piper TTS (depuis node_modules) + FX WebAudio ---
+  const $ = (s, r=document)=>r.querySelector(s);
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 48000});
+  const status = $('#status');
+  const outNodes = { gain: audioCtx.createGain(), lpf: audioCtx.createBiquadFilter(), convolver: audioCtx.createConvolver(), delay: audioCtx.createDelay(1.0), chorusGain: audioCtx.createGain(), waveShaper: audioCtx.createWaveShaper() };
+  outNodes.lpf.type='lowpass'; outNodes.lpf.frequency.value=8000; outNodes.chorusGain.gain.value=0; outNodes.gain.gain.value=1;
+  outNodes.delay.delayTime.value=0.0;
+  function makeImpulse(seconds){ const rate=audioCtx.sampleRate; const len=Math.max(1,seconds*rate|0); const b=audioCtx.createBuffer(2,len,rate); for(let c=0;c<2;c++){ const d=b.getChannelData(c); for(let i=0;i<len;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2); } } return b; }
+  outNodes.convolver.buffer = makeImpulse(0.0001);
+  const fxIn = audioCtx.createGain();
+  fxIn.connect(outNodes.waveShaper);
+  outNodes.waveShaper.connect(outNodes.delay);
+  outNodes.delay.connect(outNodes.chorusGain);
+  outNodes.chorusGain.connect(outNodes.convolver);
+  outNodes.convolver.connect(outNodes.lpf);
+  outNodes.lpf.connect(outNodes.gain);
+  outNodes.gain.connect(audioCtx.destination);
+  function subharmonicNode(amount){
+    const shaper = audioCtx.createWaveShaper(); const curve = new Float32Array(65536);
+    for(let i=0;i<curve.length;i++){ const x=i/32768-1; curve[i]=Math.sign(x)*Math.sqrt(Math.abs(x)); }
+    shaper.curve=curve; shaper.oversample='4x';
+    const lpf = audioCtx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=200; const g=audioCtx.createGain(); g.gain.value=amount;
+    shaper.connect(lpf); lpf.connect(g); return {in: shaper, out: g, setAmount(v){g.gain.value=v;}};
+  }
+  const sub = subharmonicNode(0); sub.out.connect(fxIn);
+  const directIn = audioCtx.createGain(); directIn.gain.value=1.0; directIn.connect(fxIn);
+  const ui = {
+    text: $('#text'), modelOnnx: $('#modelOnnx'), modelJson: $('#modelJson'), ttsRate: $('#ttsRate'), ttsRateOut: $('#ttsRateOut'),
+    fxPitch: $('#fxPitch'), fxPitchOut: $('#fxPitchOut'), fxSub: $('#fxSub'), fxSubOut: $('#fxSubOut'), fxDrive: $('#fxDrive'), fxDriveOut: $('#fxDriveOut'), fxChorus: $('#fxChorus'), fxChorusOut: $('#fxChorusOut'), fxReverb: $('#fxReverb'), fxReverbOut: $('#fxReverbOut'), fxLPF: $('#fxLPF'), fxLPFOut: $('#fxLPFOut'),
+    btnSpeak: $('#btnSpeak'), btnStop: $('#btnStop')
+  };
+  ui.ttsRate.addEventListener('input',()=> ui.ttsRateOut.textContent = Number(ui.ttsRate.value).toFixed(2)); ui.ttsRate.dispatchEvent(new Event('input'));
+  const bind=(range,out,fn)=> range.addEventListener('input',()=>{ out.textContent=Number(range.value).toFixed(range.step<1?2:0); fn(Number(range.value)); });
+  bind(ui.fxSub, ui.fxSubOut, v=> sub.setAmount(v));
+  function makeDistCurve(amount){ const k = amount*50; const n=65536; const curve=new Float32Array(n); for(let i=0;i<n;i++){ const x=i*2/n-1; curve[i]=(1+k)*x/(1+k*Math.abs(x)); } return curve; }
+  bind(ui.fxDrive, ui.fxDriveOut, v=> { outNodes.waveShaper.curve = makeDistCurve(v); });
+  bind(ui.fxChorus, ui.fxChorusOut, v=> { outNodes.delay.delayTime.value = v/1000; outNodes.chorusGain.gain.value = v>0? 0.5:0; });
+  bind(ui.fxReverb, ui.fxReverbOut, v=> { outNodes.convolver.buffer = makeImpulse(v); });
+  bind(ui.fxLPF, ui.fxLPFOut, v=> { outNodes.lpf.frequency.value = v; });
+  ui.fxPitch.addEventListener('input',()=> ui.fxPitchOut.textContent = Number(ui.fxPitch.value).toFixed(2)); ui.fxPitch.dispatchEvent(new Event('input'));
+  ui.fxSub.dispatchEvent(new Event('input')); ui.fxDrive.dispatchEvent(new Event('input')); ui.fxChorus.dispatchEvent(new Event('input')); ui.fxReverb.dispatchEvent(new Event('input')); ui.fxLPF.dispatchEvent(new Event('input'));
+
+  let piper = null; let currentSource=null;
+  async function loadPiper(){
+    if(piper) return piper;
+    status.textContent = 'chargement du modèle…';
+    // Import depuis node_modules (servi localement). Si votre serveur ne permet pas les imports bare, utilisez ce chemin absolu.
+    const { PiperTTS } = await import('/node_modules/@mintplex-labs/piper-tts-web/dist/index.js');
+    piper = await PiperTTS.fromFiles({ modelUrl: ui.modelOnnx.value.trim(), configUrl: ui.modelJson.value.trim() });
+    status.textContent = 'ok : modèle chargé';
+    return piper;
+  }
+
+  async function speak(){
+    await audioCtx.resume();
+    const engine = await loadPiper();
+    const txt = ui.text.value.trim() || 'Je viens des profondeurs.';
+    const speed = Number(ui.ttsRate.value); // length scale (inverse de la vitesse)
+    // API supposée: synthesize(text, { lengthScale, speaker, noiseScale, noiseW }) → { pcm: Float32Array, sampleRate }
+    const { pcm, sampleRate } = await engine.synthesize(txt, { lengthScale: 1/speed, speaker: 0, noiseScale: 0.667, noiseW: 0.8 });
+    const rate = audioCtx.sampleRate;
+    let data = pcm;
+    if(sampleRate !== rate){
+      const ratio = rate / sampleRate; const outLen = Math.floor(pcm.length * ratio); const out = new Float32Array(outLen);
+      for(let i=0;i<outLen;i++){ const pos=i/ratio; const j=pos|0; const t=pos-j; const a=pcm[j]||0, b=pcm[j+1]||0; out[i]=a+(b-a)*t; } data = out;
+    }
+    const buf = audioCtx.createBuffer(1, data.length, rate); buf.copyToChannel(data, 0);
+    if(currentSource){ try{ currentSource.stop(); }catch(_){} }
+    const src = audioCtx.createBufferSource(); src.buffer = buf; src.playbackRate.value = Number(ui.fxPitch.value);
+    src.connect(directIn); src.connect(sub.in); currentSource=src; src.start();
+  }
+  function stop(){ if(currentSource){ try{ currentSource.stop(); }catch(_){} currentSource=null; } }
+
+  const applyPreset = (p)=>{
+    const set=(id,val)=>{ const el=document.getElementById(id); el.value=String(val); el.dispatchEvent(new Event('input',{bubbles:true})); };
+    switch(p){
+      case 'demon': set('fxPitch',0.6); set('fxSub',0.7); set('fxDrive',0.35); set('fxChorus',6); set('fxReverb',1.3); set('fxLPF',2500); break;
+      case 'troll': set('fxPitch',0.8); set('fxSub',0.4); set('fxDrive',0.2); set('fxChorus',3); set('fxReverb',0.6); set('fxLPF',3000); break;
+      case 'robot': set('fxPitch',1.0); set('fxSub',0.0); set('fxDrive',0.5); set('fxChorus',10); set('fxReverb',0.2); set('fxLPF',5000); break;
+      case 'ange': set('fxPitch',1.25); set('fxSub',0.0); set('fxDrive',0.05); set('fxChorus',4); set('fxReverb',1.8); set('fxLPF',6500); break;
+      case 'chuchotement': set('fxPitch',1.05); set('fxSub',0.0); set('fxDrive',0.0); set('fxChorus',0); set('fxReverb',0.4); set('fxLPF',4000); break;
+      case 'géant': set('fxPitch',0.5); set('fxSub',0.8); set('fxDrive',0.25); set('fxChorus',2); set('fxReverb',1.0); set('fxLPF',2200); break;
+      case 'gobelin': set('fxPitch',1.5); set('fxSub',0.1); set('fxDrive',0.15); set('fxChorus',5); set('fxReverb',0.3); set('fxLPF',6000); break;
+      case 'chipmunk': set('fxPitch',1.8); set('fxSub',0.0); set('fxDrive',0.0); set('fxChorus',2); set('fxReverb',0.1); set('fxLPF',7000); break;
+    }
+  };
+  document.querySelectorAll('[data-preset]').forEach(b=> b.addEventListener('click', ()=> applyPreset(b.dataset.preset)));
+  $('#btnSpeak').addEventListener('click', speak);
+  $('#btnStop').addEventListener('click', stop);
+  </script>
+</body>
+</html>

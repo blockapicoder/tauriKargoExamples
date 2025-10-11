@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@mintplex-labs/piper-tts-web": "^1.0.4"
+  }
+}
