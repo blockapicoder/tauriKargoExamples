@@ -9,6 +9,13 @@ function D(a: THREE.Vector2, b: THREE.Vector2): number {
     return d;
 }
 
+function dirFromLonLat(lon: number, lat: number): THREE.Vector3 {
+  const cl = Math.cos(lat);
+  return new THREE.Vector3(Math.cos(lon) * cl, Math.sin(lat), Math.sin(lon) * cl).normalize();
+}  
+function DS( a: THREE.Vector2, b: THREE.Vector2) {
+    return dirFromLonLat(a.x,a.y).distanceToSquared(dirFromLonLat(b.x,b.y))
+}
 export function creerFunction(points: Point[]): (x: number, y: number) => number {
     const m: number[][] = [];
 

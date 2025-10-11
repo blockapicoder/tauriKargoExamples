@@ -1,5 +1,6 @@
 
-import * as test from "./test.ts"
+import * as test from "./node_modules/tauri-kargo-tools/dist/test.ts"
+import * as api from "./node_modules/tauri-kargo-tools/dist/api.ts"
 
 (async () => {
     let rep = await fetch("/api/get-config", { method: "POST" })
@@ -32,15 +33,8 @@ import * as test from "./test.ts"
             path: getConfig.code
         })
     })
+    await api.createClient().writeFileText("test/test.txt",'Text.Test ecriture')
 
-    await fetch("/api/file/test/test.txt", {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-
-        },
-        body: 'Text.Test ecriture'
-    })
     rep = await fetch("/api/explorer", {
         method: 'POST',
         headers: {

@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "tauri-kargo-tools": "^0.1.3"
+  }
+}
