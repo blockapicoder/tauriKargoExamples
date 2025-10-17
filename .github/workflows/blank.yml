@@ -7,9 +7,9 @@ on:
         description: "Tag de release (ex: v1.2.3 ou build-2025-10-17)"
         required: true
       examples_dir:
-        description: "Chemin du dossier d'exemples"
+        description: "Chemin du dossier d'examples"
         required: false
-        default: "exemples"
+        default: "examples"
 
 jobs:
   package:
@@ -17,7 +17,7 @@ jobs:
     permissions:
       contents: write
     env:
-      EXAMPLES_DIR: ${{ github.event.inputs.examples_dir || 'exemples' }}
+      EXAMPLES_DIR: ${{ github.event.inputs.examples_dir || 'examples' }}
       ZIP_NAME: examples-with-deps.zip
       TAG_NAME: ${{ github.event.inputs.tag_name }}
 
