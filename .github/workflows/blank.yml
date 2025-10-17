@@ -1,0 +1,71 @@
+name: Manual build examples zip & release (main)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Tag de release (ex: v1.2.3 ou build-2025-10-17)"
+        required: true
+      examples_dir:
+        description: "Chemin du dossier d'examples"
+        required: false
+        default: "examples"
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      EXAMPLES_DIR: ${{ github.event.inputs.examples_dir || 'examples' }}
+      ZIP_NAME: examples-with-deps.zip
+      TAG_NAME: ${{ github.event.inputs.tag_name }}
+
+    steps:
+      - name: Checkout main (forced)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: |
+            **/package-lock.json
+            **/npm-shrinkwrap.json
+
+      - name: Install deps in each example (if package.json exists)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test -d "$EXAMPLES_DIR"
+          # Trouve les sous-dossiers (profondeur 1-2) contenant package.json
+          mapfile -t pkgs < <(find "$EXAMPLES_DIR" -mindepth 1 -maxdepth 2 -type f -name package.json | sort)
+          for pkg in "${pkgs[@]}"; do
+            d="$(dirname "$pkg")"
+            echo ">>> Install in $d"
+            if [ -f "$d/package-lock.json" ]; then
+              (cd "$d" && npm ci)
+            else
+              (cd "$d" && npm install --no-audit --no-fund)
+            fi
+          done
+
+      - name: Zip all examples (keep node_modules)
+        run: |
+          set -euxo pipefail
+          zip -r "$ZIP_NAME" "$EXAMPLES_DIR" \
+            -x "*/.git/*" "*/node_modules/.cache/*"
+
+      - name: Publish GitHub Release (target main)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          target_commitish: main
+          name: "Examples with deps – ${{ env.TAG_NAME }}"
+          body: "Archive de ${{ env.EXAMPLES_DIR }} avec dépendances préinstallées (branche main)."
+          files: ${{ env.ZIP_NAME }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
