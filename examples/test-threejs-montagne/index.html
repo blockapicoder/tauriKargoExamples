@@ -1,114 +1,49 @@
 <!doctype html>
 <html lang="fr">
-
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Points 2D + Représentation 3D</title>
   <style>
-    :root {
-      --border: #444;
-      --header-h: 96px;
-    }
-
-    /* ↑ hauteur du header */
-    * {
-      box-sizing: border-box;
-    }
-
-    html,
-    body {
-      height: 100%;
-    }
-
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Arial;
-      display: grid;
-      grid-template-rows: var(--header-h) 1fr;
-      overflow: hidden;
-      /* pas de scroll vertical */
-    }
-
-    header {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      padding: 0 20px;
-      border-bottom: 1px solid var(--border);
-      overflow: hidden;
-      font-size: 18px;
-      /* liens plus grands */
-    }
-
-    header a {
-      text-decoration: none;
-      color: inherit;
-      padding: 10px 12px;
-      border-radius: 8px;
-    }
-
-    header a:hover {
-      background: #f2f2f2;
-    }
-
-    .container {
-      display: flex;
-      gap: 12px;
-      padding: 12px;
-      height: 100%;
-      overflow: hidden;
-    }
-
-    .panel {
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px;
-      display: flex;
-      flex-direction: column;
-      min-width: 320px;
-      flex: 1 1 50%;
-      overflow: hidden;
-      min-height: 0;
-    }
-
-    .panel h2 {
-      margin: 0 0 8px 0;
-      font-size: 14px;
-      opacity: .75;
-    }
-
-    .fill {
-      flex: 1 1 auto;
-      min-height: 0;
-      overflow: hidden;
-    }
-
-    #app {
-      width: 100%;
-      height: 100%;
-    }
-
-    canvas {
-      width: 100%;
-      height: 100%;
-      border-radius: 8px;
-      background: #fff;
-    }
-
-    .legend {
-      font-size: 12px;
-      opacity: .7;
-      margin-top: 6px;
-    }
+    :root { --border:#444; --header-h:96px; }
+    *{box-sizing:border-box} html,body{height:100%}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial;display:grid;grid-template-rows:var(--header-h) 1fr;overflow:hidden}
+    header{display:flex;align-items:center;gap:16px;padding:0 20px;border-bottom:1px solid var(--border);overflow:hidden;font-size:18px}
+    header a{text-decoration:none;color:inherit;padding:10px 12px;border-radius:8px}
+    header a:hover{background:#f2f2f2}
+    .container{display:flex;gap:12px;padding:12px;height:100%;overflow:hidden}
+    .panel{border:1px solid var(--border);border-radius:10px;padding:10px;display:flex;flex-direction:column;min-width:320px;flex:1 1 50%;overflow:hidden;min-height:0}
+    .panel h2{margin:0 0 8px 0;font-size:14px;opacity:.75}
+    .fill{flex:1 1 auto;min-height:0;overflow:hidden}
+    #app{width:100%;height:100%}
+    canvas{width:100%;height:100%;border-radius:8px;background:#fff}
+    .legend{font-size:12px;opacity:.7;margin-top:6px}
+    .picker{display:flex;align-items:center;gap:8px;}
+    .picker select{
+      
+      font-size:14px;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:#fff}
+    #formule{font-size:12px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:40vw}
   </style>
 </head>
 
 <body>
   <header>
+        <!-- Sélecteur d'interpolation -->
+    <div class="picker">
+      <label for="mode">Interpolation :</label>
+      <select id="mode" aria-label="Choisir le schéma d'interpolation">
+        <option value="SIN" selected>SINUS</option>
+        <option value="DP">DP</option>
+        <option value="RDP">RDP</option>
+      </select>
+    </div>
     <a href="./compression.html">Compression</a>
     <a href="./publication.html">Publication</a>
     <a href="./webgpu-test.html">Webgpu test</a>
+
+
+
+    <!-- Formule affichée -->
     <div id="formule"></div>
 
     <script type="importmap">
@@ -122,13 +57,11 @@
   </header>
 
   <div class="container">
-    <!-- Gauche : représentation 3D -->
     <section class="panel">
       <h2>Représentation 3D</h2>
       <div id="app" class="fill"></div>
     </section>
 
-    <!-- Droite : canvas 2D interactif -->
     <section class="panel">
       <h2>Éditeur 2D</h2>
       <div class="fill">
@@ -137,7 +70,8 @@
     </section>
   </div>
 
+
+
   <script src="./main.js" type="module"></script>
 </body>
-
 </html>

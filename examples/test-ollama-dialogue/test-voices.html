@@ -1,178 +1,316 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Voix "démon", "troll"… — Piper TTS (100% local)</title>
-  <style>
-    :root { --bg:#0b0d10; --panel:#111418; --soft:#1a1f25; --text:#e8eef5; --muted:#9fb0c2; --accent:#5cc8ff; --ok:#3ddc97; --err:#ff6b6b; --br:16px; }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{margin:0; background:linear-gradient(160deg,var(--bg),#0f1216 45%,#0a0c10); color:var(--text); font:16px/1.45 system-ui,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
-    .app{max-width:1100px; margin:0 auto; padding:24px}
-    h1{margin:0 0 .5rem 0}
-    .grid{display:grid; gap:16px; grid-template-columns: 1.1fr .9fr}
-    @media (max-width:980px){ .grid{grid-template-columns:1fr} }
-    .card{background:linear-gradient(180deg,var(--panel),var(--soft)); border:1px solid #141922; border-radius:var(--br); padding:16px; box-shadow:0 6px 24px rgba(0,0,0,.25)}
-    label{font-size:12px; color:var(--muted)}
-    textarea, input, select{width:100%; background:#0f141c; color:var(--text); border:1px solid #1e2632; border-radius:12px; padding:10px 12px; outline:none}
-    textarea{min-height:140px; resize:vertical}
-    button{ border:1px solid #1f2834; background:linear-gradient(180deg,#111923,#0d151e); color:var(--text); padding:10px 14px; border-radius:12px; cursor:pointer }
-    button.primary{border-color:#1a3a4d; background:linear-gradient(180deg,#0f2a3a,#0c2230); color:var(--accent)}
-    .row{display:flex; gap:12px; align-items:center; flex-wrap:wrap}
-    .slider{display:grid; grid-template-columns:130px 1fr 56px; gap:8px; align-items:center}
-    .preset{display:grid; grid-template-columns: 1fr 1fr; gap:8px}
-    .pill{display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:#0f151c; border:1px solid #1e2632; color:#9fb0c2}
-    .hint{color:#9fb0c2; font-size:13px}
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Azure Speech TTS + Tone.js — Troll / Démon / Ange</title>
+<style>
+  :root { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial; }
+  body { margin:0; padding:24px; background:#0b0c10; color:#e5e7eb; }
+  h1 { margin:0 0 12px; font-size:20px; }
+  .row { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+  .card { background:#111318; border:1px solid #22252e; border-radius:14px; padding:16px; margin:12px 0; box-shadow:0 4px 14px rgba(0,0,0,.25); }
+  label { font-size:13px; opacity:.9; display:flex; flex-direction:column; gap:6px; }
+  input[type="range"] { width:230px; }
+  input, select, textarea, button { background:#0f1116; border:1px solid #2a2f3a; color:#e5e7eb; border-radius:10px; padding:10px; }
+  textarea { width:100%; min-height:120px; }
+  button { cursor:pointer; }
+  .small { font-size:12px; opacity:.85; }
+  .ok { color:#6ee7b7; }
+  .warn { color:#ffd166; }
+  .muted { opacity:.7; }
+</style>
 </head>
 <body>
-  <div class="app">
-    <h1>🦇 Générateur de voix fantastiques (démon, troll, robot…) – Piper (offline)</h1>
-    <p class="hint">Aucune API externe. Texte → <strong>Piper TTS (ONNX/WASM)</strong> → effets <em>WebAudio</em> (pitch, sous‑harmoniques, distorsion, chorus, réverb, filtre). Servez localement <code>node_modules</code> et vos modèles Piper (ONNX + JSON).</p>
+<h1>Azure Speech TTS + Tone.js — voix “troll / démon / ange”</h1>
+<p class="small muted">Ordre : <b>Init</b> → <b>Parler</b>. (Servez ce fichier via un serveur local, ex. <code>npx http-server</code>.)</p>
 
-    <div class="grid">
-      <section class="card">
-        <label for="text">Texte</label>
-        <textarea id="text" placeholder="Écris quelque chose de maléfique…"></textarea>
-        <div class="row" style="margin-top:10px">
-          <div style="flex:1">
-            <label>Modèle Piper (.onnx)</label>
-            <input id="modelOnnx" value="/models/fr/model.onnx"/>
-          </div>
-          <div style="flex:1">
-            <label>Config Piper (.json)</label>
-            <input id="modelJson" value="/models/fr/model.json"/>
-          </div>
-        </div>
-        <div class="row" style="margin-top:10px">
-          <div style="flex:1">
-            <label>Vitesse (tokens → durée)</label>
-            <input id="ttsRate" type="range" min="0.5" max="2.0" step="0.05" value="1.0" />
-          </div>
-          <div style="width:110px"><output id="ttsRateOut">1.00</output>×</div>
-        </div>
-        <div class="row" style="margin-top:10px">
-          <button class="primary" id="btnSpeak">▶️ Lire</button>
-          <button id="btnStop">⏹️ Stop</button>
-          <span class="pill" id="status">moteur : non chargé</span>
-        </div>
-      </section>
-
-      <aside class="card">
-        <h3 style="margin-top:0">Préréglages de timbre</h3>
-        <div class="preset">
-          <button data-preset="demon">😈 Démon</button>
-          <button data-preset="troll">🪓 Troll</button>
-          <button data-preset="robot">🤖 Robot</button>
-          <button data-preset="ange">👼 Ange</button>
-          <button data-preset="chuchotement">🤫 Chuchotement</button>
-          <button data-preset="géant">🗿 Géant</button>
-          <button data-preset="gobelin">🧪 Gobelin</button>
-          <button data-preset="chipmunk">🐿️ Chipmunk</button>
-        </div>
-        <hr>
-        <h3>Réglages fins (FX)</h3>
-        <div class="slider"><label>Pitch playbackRate</label><input id="fxPitch" type="range" min="0.4" max="2.0" step="0.01" value="1"><output id="fxPitchOut">1.00</output></div>
-        <div class="slider"><label>Sub‑harmonique</label><input id="fxSub" type="range" min="0" max="1" step="0.01" value="0.0"><output id="fxSubOut">0.00</output></div>
-        <div class="slider"><label>Distorsion</label><input id="fxDrive" type="range" min="0" max="1" step="0.01" value="0.0"><output id="fxDriveOut">0.00</output></div>
-        <div class="slider"><label>Chorus (ms)</label><input id="fxChorus" type="range" min="0" max="25" step="0.1" value="0"><output id="fxChorusOut">0.0</output></div>
-        <div class="slider"><label>Réverb (sec)</label><input id="fxReverb" type="range" min="0" max="3" step="0.05" value="0"><output id="fxReverbOut">0.00</output></div>
-        <div class="slider"><label>LPF cutoff (Hz)</label><input id="fxLPF" type="range" min="200" max="8000" step="50" value="8000"><output id="fxLPFOut">8000</output></div>
-      </aside>
-    </div>
+<div class="card">
+  <div class="row">
+    <label>Azure Speech Key <input id="key" size="36" placeholder="YOUR_AZURE_SPEECH_KEY"></label>
+    <label>Region <input id="region" size="12" placeholder="westeurope"></label>
+    <label>Voix Azure
+      <select id="voice">
+        <!-- Deux voix FR courantes, changez à volonté -->
+        <option value="fr-FR-DeniseNeural">fr-FR-DeniseNeural</option>
+        <option value="fr-FR-HenriNeural">fr-FR-HenriNeural</option>
+      </select>
+    </label>
+    <label>Persona
+      <select id="persona">
+        <option value="narrator">Narrateur</option>
+        <option value="troll">Troll</option>
+        <option value="demon">Démon</option>
+        <option value="angel">Ange</option>
+        <option value="robot">Robot</option>
+      </select>
+    </label>
   </div>
+  <div class="row" style="margin-top:10px">
+    <button id="init">1) Init audio</button>
+    <button id="speak">2) Parler</button>
+    <span id="status" class="small"></span>
+  </div>
+</div>
 
-  <script type="module">
-  // --- Piper TTS (depuis node_modules) + FX WebAudio ---
-  const $ = (s, r=document)=>r.querySelector(s);
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)({sampleRate: 48000});
-  const status = $('#status');
-  const outNodes = { gain: audioCtx.createGain(), lpf: audioCtx.createBiquadFilter(), convolver: audioCtx.createConvolver(), delay: audioCtx.createDelay(1.0), chorusGain: audioCtx.createGain(), waveShaper: audioCtx.createWaveShaper() };
-  outNodes.lpf.type='lowpass'; outNodes.lpf.frequency.value=8000; outNodes.chorusGain.gain.value=0; outNodes.gain.gain.value=1;
-  outNodes.delay.delayTime.value=0.0;
-  function makeImpulse(seconds){ const rate=audioCtx.sampleRate; const len=Math.max(1,seconds*rate|0); const b=audioCtx.createBuffer(2,len,rate); for(let c=0;c<2;c++){ const d=b.getChannelData(c); for(let i=0;i<len;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2); } } return b; }
-  outNodes.convolver.buffer = makeImpulse(0.0001);
-  const fxIn = audioCtx.createGain();
-  fxIn.connect(outNodes.waveShaper);
-  outNodes.waveShaper.connect(outNodes.delay);
-  outNodes.delay.connect(outNodes.chorusGain);
-  outNodes.chorusGain.connect(outNodes.convolver);
-  outNodes.convolver.connect(outNodes.lpf);
-  outNodes.lpf.connect(outNodes.gain);
-  outNodes.gain.connect(audioCtx.destination);
-  function subharmonicNode(amount){
-    const shaper = audioCtx.createWaveShaper(); const curve = new Float32Array(65536);
-    for(let i=0;i<curve.length;i++){ const x=i/32768-1; curve[i]=Math.sign(x)*Math.sqrt(Math.abs(x)); }
-    shaper.curve=curve; shaper.oversample='4x';
-    const lpf = audioCtx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=200; const g=audioCtx.createGain(); g.gain.value=amount;
-    shaper.connect(lpf); lpf.connect(g); return {in: shaper, out: g, setAmount(v){g.gain.value=v;}};
-  }
-  const sub = subharmonicNode(0); sub.out.connect(fxIn);
-  const directIn = audioCtx.createGain(); directIn.gain.value=1.0; directIn.connect(fxIn);
-  const ui = {
-    text: $('#text'), modelOnnx: $('#modelOnnx'), modelJson: $('#modelJson'), ttsRate: $('#ttsRate'), ttsRateOut: $('#ttsRateOut'),
-    fxPitch: $('#fxPitch'), fxPitchOut: $('#fxPitchOut'), fxSub: $('#fxSub'), fxSubOut: $('#fxSubOut'), fxDrive: $('#fxDrive'), fxDriveOut: $('#fxDriveOut'), fxChorus: $('#fxChorus'), fxChorusOut: $('#fxChorusOut'), fxReverb: $('#fxReverb'), fxReverbOut: $('#fxReverbOut'), fxLPF: $('#fxLPF'), fxLPFOut: $('#fxLPFOut'),
-    btnSpeak: $('#btnSpeak'), btnStop: $('#btnStop')
+<div class="card">
+  <h2 style="margin:0 0 8px;font-size:16px">Texte</h2>
+  <textarea id="text">Bonjour, voyageur… Approche, et écoute la voix des esprits.</textarea>
+</div>
+
+<div class="card">
+  <h2 style="margin:0 0 8px;font-size:16px">Réglages fins (optionnels)</h2>
+  <div class="row">
+    <label>Grave/Aigu (pitch-shift en demi-tons)
+      <input id="semitones" type="range" min="-12" max="12" value="-3" step="1">
+    </label>
+    <label>Écho (delay en s)
+      <input id="delay" type="range" min="0" max="1" value="0.25" step="0.01">
+    </label>
+    <label>Feedback
+      <input id="feedback" type="range" min="0" max="0.95" value="0.35" step="0.01">
+    </label>
+    <label>Réverb (decay en s)
+      <input id="reverb" type="range" min="0.1" max="8" value="2.5" step="0.1">
+    </label>
+    <label>Distorsion
+      <input id="dist" type="range" min="0" max="0.9" value="0.0" step="0.01">
+    </label>
+    <label>BitCrusher (bits)
+      <input id="bits" type="range" min="1" max="8" value="8" step="1">
+    </label>
+    <label>Filtre (Hz, 0=off)
+      <input id="filter" type="range" min="0" max="12000" value="0" step="50">
+    </label>
+    <label>Mix (wet)
+      <input id="wet" type="range" min="0" max="1" value="0.6" step="0.01">
+    </label>
+  </div>
+</div>
+
+<script type="module">
+import * as Tone from "https://cdn.skypack.dev/tone";
+import * as sdk  from "https://aka.ms/csspeech/jsbrowserpackageraw"; // Azure Speech SDK (UMD)
+
+const $ = (id)=>document.getElementById(id);
+const keyEl=$("key"), regionEl=$("region"), voiceEl=$("voice"), personaEl=$("persona");
+const textEl=$("text"), status=$("status");
+const semitones=$("semitones"), delayEl=$("delay"), feedback=$("feedback"), reverb=$("reverb");
+const dist=$("dist"), bits=$("bits"), filter=$("filter"), wet=$("wet");
+
+let audioReady=false;
+async function unlockAudio(){
+  if(audioReady) return;
+  await Tone.start();
+  const ctx = Tone.getContext().rawContext || Tone.getContext().context;
+  if (ctx && ctx.state !== "running") await ctx.resume();
+  audioReady = true;
+}
+
+// ---------- Tone.js graph ----------
+let fxBuilt=false;
+let pitchShift, echo, verb, distortion, crusher, biquad, wetGain, dryGain, limiter;
+
+async function buildFX(){
+  pitchShift  = new Tone.PitchShift({ pitch: parseInt(semitones.value,10) });
+  echo        = new Tone.FeedbackDelay({ delayTime: parseFloat(delayEl.value), feedback: parseFloat(feedback.value) });
+  verb        = new Tone.Reverb({ decay: parseFloat(reverb.value) });
+  await verb.generate();
+  distortion  = new Tone.Distortion(parseFloat(dist.value)); // 0..1
+  crusher     = new Tone.BitCrusher(parseInt(bits.value,10)); // 1..8
+  biquad      = new Tone.Filter({ type:"lowpass", frequency: Math.max(0.001, parseFloat(filter.value)||0) || 20000, rolloff:-24 });
+  wetGain     = new Tone.Gain(parseFloat(wet.value));
+  dryGain     = new Tone.Gain(1 - parseFloat(wet.value));
+  limiter     = new Tone.Limiter(-1);
+
+  // Chaîne wet: pitch -> echo -> reverb -> dist -> crusher -> filter -> wetGain
+  pitchShift.chain(echo, verb, distortion, crusher, biquad, wetGain);
+  // Sorties
+  wetGain.connect(limiter);
+  dryGain.connect(limiter);
+  limiter.toDestination();
+
+  fxBuilt = true;
+}
+
+async function updateFX(){
+  pitchShift.pitch = parseInt(semitones.value,10);
+  echo.delayTime.value = parseFloat(delayEl.value);
+  echo.feedback.value  = parseFloat(feedback.value);
+  verb.decay = parseFloat(reverb.value); await verb.generate();
+  distortion.distortion = parseFloat(dist.value);
+  crusher.bits = parseInt(bits.value,10);
+  const f = parseFloat(filter.value);
+  biquad.frequency.value = f>0 ? f : 20000; // 0 = désactivé ~ passe-tout
+  wetGain.gain.value = parseFloat(wet.value);
+  dryGain.gain.value = 1 - parseFloat(wet.value);
+}
+
+// ---------- Personae (préréglages SSML + FX) ----------
+function personaPreset(p){
+  // Valeurs par défaut
+  let ssml = {
+    style: "general",
+    styledegree: "1.0",
+    pitch: "0st",
+    rate: "0%"
   };
-  ui.ttsRate.addEventListener('input',()=> ui.ttsRateOut.textContent = Number(ui.ttsRate.value).toFixed(2)); ui.ttsRate.dispatchEvent(new Event('input'));
-  const bind=(range,out,fn)=> range.addEventListener('input',()=>{ out.textContent=Number(range.value).toFixed(range.step<1?2:0); fn(Number(range.value)); });
-  bind(ui.fxSub, ui.fxSubOut, v=> sub.setAmount(v));
-  function makeDistCurve(amount){ const k = amount*50; const n=65536; const curve=new Float32Array(n); for(let i=0;i<n;i++){ const x=i*2/n-1; curve[i]=(1+k)*x/(1+k*Math.abs(x)); } return curve; }
-  bind(ui.fxDrive, ui.fxDriveOut, v=> { outNodes.waveShaper.curve = makeDistCurve(v); });
-  bind(ui.fxChorus, ui.fxChorusOut, v=> { outNodes.delay.delayTime.value = v/1000; outNodes.chorusGain.gain.value = v>0? 0.5:0; });
-  bind(ui.fxReverb, ui.fxReverbOut, v=> { outNodes.convolver.buffer = makeImpulse(v); });
-  bind(ui.fxLPF, ui.fxLPFOut, v=> { outNodes.lpf.frequency.value = v; });
-  ui.fxPitch.addEventListener('input',()=> ui.fxPitchOut.textContent = Number(ui.fxPitch.value).toFixed(2)); ui.fxPitch.dispatchEvent(new Event('input'));
-  ui.fxSub.dispatchEvent(new Event('input')); ui.fxDrive.dispatchEvent(new Event('input')); ui.fxChorus.dispatchEvent(new Event('input')); ui.fxReverb.dispatchEvent(new Event('input')); ui.fxLPF.dispatchEvent(new Event('input'));
-
-  let piper = null; let currentSource=null;
-  async function loadPiper(){
-    if(piper) return piper;
-    status.textContent = 'chargement du modèle…';
-    // Import depuis node_modules (servi localement). Si votre serveur ne permet pas les imports bare, utilisez ce chemin absolu.
-    const { PiperTTS } = await import('/node_modules/@mintplex-labs/piper-tts-web/dist/index.js');
-    piper = await PiperTTS.fromFiles({ modelUrl: ui.modelOnnx.value.trim(), configUrl: ui.modelJson.value.trim() });
-    status.textContent = 'ok : modèle chargé';
-    return piper;
-  }
-
-  async function speak(){
-    await audioCtx.resume();
-    const engine = await loadPiper();
-    const txt = ui.text.value.trim() || 'Je viens des profondeurs.';
-    const speed = Number(ui.ttsRate.value); // length scale (inverse de la vitesse)
-    // API supposée: synthesize(text, { lengthScale, speaker, noiseScale, noiseW }) → { pcm: Float32Array, sampleRate }
-    const { pcm, sampleRate } = await engine.synthesize(txt, { lengthScale: 1/speed, speaker: 0, noiseScale: 0.667, noiseW: 0.8 });
-    const rate = audioCtx.sampleRate;
-    let data = pcm;
-    if(sampleRate !== rate){
-      const ratio = rate / sampleRate; const outLen = Math.floor(pcm.length * ratio); const out = new Float32Array(outLen);
-      for(let i=0;i<outLen;i++){ const pos=i/ratio; const j=pos|0; const t=pos-j; const a=pcm[j]||0, b=pcm[j+1]||0; out[i]=a+(b-a)*t; } data = out;
-    }
-    const buf = audioCtx.createBuffer(1, data.length, rate); buf.copyToChannel(data, 0);
-    if(currentSource){ try{ currentSource.stop(); }catch(_){} }
-    const src = audioCtx.createBufferSource(); src.buffer = buf; src.playbackRate.value = Number(ui.fxPitch.value);
-    src.connect(directIn); src.connect(sub.in); currentSource=src; src.start();
-  }
-  function stop(){ if(currentSource){ try{ currentSource.stop(); }catch(_){} currentSource=null; } }
-
-  const applyPreset = (p)=>{
-    const set=(id,val)=>{ const el=document.getElementById(id); el.value=String(val); el.dispatchEvent(new Event('input',{bubbles:true})); };
-    switch(p){
-      case 'demon': set('fxPitch',0.6); set('fxSub',0.7); set('fxDrive',0.35); set('fxChorus',6); set('fxReverb',1.3); set('fxLPF',2500); break;
-      case 'troll': set('fxPitch',0.8); set('fxSub',0.4); set('fxDrive',0.2); set('fxChorus',3); set('fxReverb',0.6); set('fxLPF',3000); break;
-      case 'robot': set('fxPitch',1.0); set('fxSub',0.0); set('fxDrive',0.5); set('fxChorus',10); set('fxReverb',0.2); set('fxLPF',5000); break;
-      case 'ange': set('fxPitch',1.25); set('fxSub',0.0); set('fxDrive',0.05); set('fxChorus',4); set('fxReverb',1.8); set('fxLPF',6500); break;
-      case 'chuchotement': set('fxPitch',1.05); set('fxSub',0.0); set('fxDrive',0.0); set('fxChorus',0); set('fxReverb',0.4); set('fxLPF',4000); break;
-      case 'géant': set('fxPitch',0.5); set('fxSub',0.8); set('fxDrive',0.25); set('fxChorus',2); set('fxReverb',1.0); set('fxLPF',2200); break;
-      case 'gobelin': set('fxPitch',1.5); set('fxSub',0.1); set('fxDrive',0.15); set('fxChorus',5); set('fxReverb',0.3); set('fxLPF',6000); break;
-      case 'chipmunk': set('fxPitch',1.8); set('fxSub',0.0); set('fxDrive',0.0); set('fxChorus',2); set('fxReverb',0.1); set('fxLPF',7000); break;
-    }
+  let fx = {
+    semitones: 0, delay: 0.15, feedback: 0.2, reverb: 1.4,
+    dist: 0.0, bits: 8, filter: 0, wet: 0.4
   };
-  document.querySelectorAll('[data-preset]').forEach(b=> b.addEventListener('click', ()=> applyPreset(b.dataset.preset)));
-  $('#btnSpeak').addEventListener('click', speak);
-  $('#btnStop').addEventListener('click', stop);
-  </script>
+
+  switch(p){
+    case "troll":
+      ssml = { style:"angry", styledegree:"1.0", pitch:"-4st", rate:"-5%" };
+      fx   = { semitones:-5, delay:0.18, feedback:0.25, reverb:1.8, dist:0.08, bits:8, filter:1800, wet:0.6 };
+      break;
+    case "demon":
+      ssml = { style:"angry", styledegree:"1.2", pitch:"-8st", rate:"-8%" };
+      fx   = { semitones:-8, delay:0.22, feedback:0.28, reverb:2.6, dist:0.22, bits:6, filter:1200, wet:0.75 };
+      break;
+    case "angel":
+      ssml = { style:"calm", styledegree:"1.0", pitch:"+3st", rate:"+5%" };
+      fx   = { semitones:+3, delay:0.35, feedback:0.30, reverb:3.5, dist:0.0, bits:8, filter:0, wet:0.65 };
+      break;
+    case "robot":
+      ssml = { style:"assistant", styledegree:"0.6", pitch:"0st", rate:"0%" };
+      fx   = { semitones:0, delay:0.12, feedback:0.18, reverb:0.8, dist:0.05, bits:4, filter:0, wet:0.5 };
+      break;
+    default: // narrator
+      ssml = { style:"general", styledegree:"1.0", pitch:"0st", rate:"+2%" };
+      fx   = { semitones:0, delay:0.20, feedback:0.20, reverb:1.6, dist:0.0, bits:8, filter:0, wet:0.45 };
+  }
+  return { ssml, fx };
+}
+
+// Applique les presets FX dans l’UI (et graph)
+async function applyFxPreset(p){
+  const { fx } = personaPreset(p);
+  semitones.value = fx.semitones;
+  delayEl.value   = fx.delay;
+  feedback.value  = fx.feedback;
+  reverb.value    = fx.reverb;
+  dist.value      = fx.dist;
+  bits.value      = fx.bits;
+  filter.value    = fx.filter;
+  wet.value       = fx.wet;
+  if (fxBuilt) await updateFX();
+}
+
+// Génère SSML avec style + prosody (Azure ignorera les styles non supportés par la voix)
+function buildSSML(text, voiceName, personaKey){
+  const { ssml } = personaPreset(personaKey);
+  const esc = (s)=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const t = esc(text);
+  return `
+<speak version="1.0" xml:lang="fr-FR" xmlns:mstts="https://www.w3.org/2001/mstts">
+  <voice name="${voiceName}">
+    <mstts:express-as style="${ssml.style}" styledegree="${ssml.styledegree}">
+      <prosody pitch="${ssml.pitch}" rate="${ssml.rate}">
+        ${t}
+      </prosody>
+    </mstts:express-as>
+  </voice>
+</speak>`.trim();
+}
+
+// ---------- Azure synthesis (PCM -> WAV -> Tone.Player) ----------
+function pcm16ToWavBlob(u8, sampleRate=24000){
+  // u8 = Uint8Array PCM16LE mono
+  const numFrames = u8.byteLength / 2;
+  const blockAlign = 2; // mono 16-bit
+  const byteRate = sampleRate * blockAlign;
+  const dataSize = u8.byteLength;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const dv = new DataView(buffer);
+  let p = 0;
+  function wUint32(v){ dv.setUint32(p, v, true); p+=4; }
+  function wUint16(v){ dv.setUint16(p, v, true); p+=2; }
+  function wStr(s){ for(let i=0;i<s.length;i++) dv.setUint8(p++, s.charCodeAt(i)); }
+
+  wStr("RIFF"); wUint32(36 + dataSize); wStr("WAVE");
+  wStr("fmt "); wUint32(16); wUint16(1); // PCM
+  wUint16(1); // mono
+  wUint32(sampleRate); wUint32(byteRate); wUint16(blockAlign); wUint16(16);
+  wStr("data"); wUint32(dataSize);
+  new Uint8Array(buffer, 44).set(u8);
+  return new Blob([buffer], { type: "audio/wav" });
+}
+
+async function synthesizeAzureSSML(ssml, key, region){
+  const speechConfig = sdk.SpeechConfig.fromSubscription(key, region);
+  // Voix/langue configurées via SSML, mais on met par défaut FR :
+  speechConfig.speechSynthesisLanguage = "fr-FR";
+  // Format PCM 16-bit 24kHz mono (facile à WAVifier)
+  speechConfig.setProperty(
+    sdk.PropertyId.SpeechServiceConnection_SynthOutputFormat,
+    sdk.SpeechSynthesisOutputFormat.Raw24Khz16BitMonoPcm
+  );
+  const audioOut = sdk.AudioConfig.fromDefaultSpeakerOutput(); // requis par SDK, on n’utilise pas le haut-parleur
+  const synth = new sdk.SpeechSynthesizer(speechConfig, audioOut);
+
+  const result = await new Promise((resolve, reject)=>{
+    synth.speakSsmlAsync(ssml, r => resolve(r), e => reject(e));
+  });
+  synth.close();
+
+  if (result.reason !== sdk.ResultReason.SynthesizingAudioCompleted) {
+    throw new Error("Synthèse non complétée: " + result.reason);
+  }
+  const u8 = new Uint8Array(result.audioData); // PCM16LE mono 24kHz
+  return pcm16ToWavBlob(u8, 24000);
+}
+
+async function playWavBlobWithFX(blob){
+  const url = URL.createObjectURL(blob);
+  const player = new Tone.Player({ autostart:false });
+  // Split dry / wet
+  player.fan(dryGain, pitchShift);
+  await player.load(url); // charge le buffer
+  URL.revokeObjectURL(url);
+  player.start();
+}
+
+// ---------- UI ----------
+$("init").onclick = async ()=>{
+  try {
+    await unlockAudio();
+    if (!fxBuilt) await buildFX();
+    await applyFxPreset(personaEl.value);
+    // sliders réactifs
+    [semitones, delayEl, feedback, reverb, dist, bits, filter, wet].forEach(el => el.oninput = updateFX);
+    personaEl.onchange = () => applyFxPreset(personaEl.value);
+    status.textContent = "Audio prêt ✅"; status.className = "small ok";
+  } catch(e){
+    status.textContent = "Init audio : " + (e?.message || e); status.className="small warn";
+  }
+};
+
+$("speak").onclick = async ()=>{
+  try {
+    await unlockAudio();
+    if (!fxBuilt) await buildFX();
+    await updateFX();
+
+    const key = keyEl.value.trim(); const region = regionEl.value.trim();
+    if (!key || !region) { status.textContent = "Renseigne key/region Azure."; status.className="small warn"; return; }
+
+    // Construire SSML avec style + prosody selon persona
+    const ssml = buildSSML(textEl.value, voiceEl.value, personaEl.value);
+
+    status.textContent = "Synthèse Azure…";
+    const wav = await synthesizeAzureSSML(ssml, key, region);
+
+    status.textContent = "Lecture…";
+    await playWavBlobWithFX(wav);
+
+    status.textContent = "OK ✅"; status.className = "small ok";
+  } catch(e){
+    console.error(e);
+    status.textContent = "Erreur : " + (e?.message || e); status.className="small warn";
+  }
+};
+</script>
 </body>
 </html>

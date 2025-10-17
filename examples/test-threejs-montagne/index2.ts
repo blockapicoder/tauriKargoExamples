@@ -2,9 +2,24 @@ import * as THREE from 'three';
 import { ParametricGeometry } from 'three/examples/jsm/Addons.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { updateFormulaPanel } from './formule';
-import { creerFunction, Point } from './spi';
-
+import { creerFunction, Point, TypeFonction } from './spi';
+let tf: TypeFonction = "SIN"
+let currentSelection: number = 0
+let data: Point[] = [
+ 
+];
+let F = creerFunction(tf, data);
 updateFormulaPanel();
+const select = document.getElementById('mode');
+
+
+function updateUI() {
+
+  const sel = (select as HTMLSelectElement)!.value
+  tf = sel as TypeFonction
+  setTypeFonction()
+}
+select!.addEventListener('change', updateUI);
 
 const scene = new THREE.Scene();
 
@@ -48,12 +63,7 @@ controls.maxDistance = 50;
 controls.target.set(0, 0, 0);
 controls.update();
 
-function creerPoint(x: number, y: number, z: number): Point {
-  return {
-    value: new THREE.Vector2(x, y),
-    y: z,
-  };
-}
+
 
 let level = 1;
 
@@ -61,20 +71,7 @@ let level = 1;
 let max = 2;
 
 
-let data: Point[] = [
-  creerPoint(20, 10, -1),
-  creerPoint(80, 10, 2),
-  creerPoint(40, 40, -15),
-  creerPoint(90, 90, 3.5),
-  creerPoint(30, 15, 2.75),
-  creerPoint(75, 90, 10.85),
-  creerPoint(70, 95, 3.25),
-  creerPoint(70, 90, 3.1),
-  creerPoint(40, 50, 3.1),
-  creerPoint(10, 90, 4),
-  creerPoint(50, 50, 1.5),
-  creerPoint(65, 40, -23.25),
-];
+
 
 // Groupes
 const meshAndControlPointsGroup = new THREE.Group();
@@ -106,7 +103,7 @@ function drawControlPoints(points: Point[], selection: number) {
   }
 }
 
-let F = creerFunction(data);
+
 
 interface P {
   id: number;
@@ -115,6 +112,29 @@ interface P {
   h: number;
 }
 
+export function setTypeFonction() {
+
+
+  F = creerFunction(tf, data);
+  geometry.dispose();
+  geometry = new ParametricGeometry(
+    (u, v, vec) => {
+      const x = 100 * u;
+      const y = 100 * v;
+      const z = F(x, y);
+      vec.setX(x / 10 - 5);
+      vec.setZ(y / 10 - 5);
+      vec.setY(z / 10);
+    },
+    50,
+    50
+  );
+  mesh.geometry = geometry;
+  drawControlPoints(data, currentSelection);
+  for (let p of data) {
+    console.log(p.y, F(p.value.x, p.value.y));
+  }
+}
 export function setPoints(ls: P[], selection: number) {
   const newData: Point[] = ls.map((p) => {
     return {
@@ -122,7 +142,9 @@ export function setPoints(ls: P[], selection: number) {
       y: p.h,
     };
   });
-  F = creerFunction(newData);
+  data = newData
+  currentSelection = selection
+  F = creerFunction(tf, newData);
   geometry.dispose();
   geometry = new ParametricGeometry(
     (u, v, vec) => {

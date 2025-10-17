@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+    <head>
+        <meta charset="UTF-8" />
+        <title>Explorateur d'objets programmable</title>
+        <style>
+            html,
+            body {
+                margin: 0;
+                height: 100%;
+                overflow: hidden;
+                font-family: sans-serif;
+            }
+
+            #container {
+                display: flex;
+                height: 100%;
+                width: 100%;
+            }
+
+            #left {
+                width: 60%;
+                padding: 10px;
+                box-sizing: border-box;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+
+            #right {
+                width: 60%;
+                display: flex;
+                flex-direction: column;
+                height: 100%;
+            }
+
+            canvas {
+                border: 1px solid black;
+                background-color: #f0f0f0;
+            }
+
+            #editor {
+                flex-grow: 1;
+            }
+
+            #run-btn {
+                padding: 10px;
+                border: none;
+                background: #007acc;
+                color: white;
+                font-size: 16px;
+                cursor: pointer;
+            }
+
+            #info {
+                margin-top: 10px;
+            }
+
+            #console {
+                height: 150px;
+                overflow-y: auto;
+                background: #111;
+                color: #0f0;
+                padding: 10px;
+                font-family: monospace;
+                white-space: pre-wrap;
+                box-sizing: border-box;
+                border-top: 1px solid #444;
+            }
+        </style>
+        <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+    </head>
+
+    <body>
+        <div id="container">
+            <div id="left">
+                <canvas id="world" width="700" height="700"></canvas>
+                <div id="info">
+                    <p>Objets récupérés : <span id="collected">0</span></p>
+                    <p>Distance parcourue : <span id="distance">0</span> px</p>
+                </div>
+            </div>
+            <div id="right">
+
+                <div style="display: flex; gap: 10px; margin-top: 5px; padding: 5px">
+                    <button id="run-btn" >Exécuter</button>
+
+                </div>
+
+            </div>
+        </div>
+
+
+
+
+    </body>
+    <script src="./index.ts" type="module"></script>
+
+</html>
