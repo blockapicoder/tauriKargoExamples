@@ -9,7 +9,7 @@ export async function chatOllama(
   model = "gemma3-2060",
   opts: { stream?: boolean; onToken?: (t: string) => void; url?: string; format?: string } = {}
 ): Promise<string> {
-  const { stream = false, onToken, url = "http://localhost:11434/api/chat", format } = opts;
+  const { stream = false, onToken, url = "https://blockapicoder.com/ollama/api/chat", format } = opts;
   const body: ChatRequest = { model, messages, stream, format };
 
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });

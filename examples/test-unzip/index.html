@@ -1,0 +1,104 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Download & Unzip .tgz via API</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 900px; margin: 40px auto; }
+  form { display: grid; gap: 10px; grid-template-columns: 160px 1fr; align-items: center; }
+  label { color: #444; }
+  input { padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+  button { grid-column: 1 / -1; padding: 10px 14px; border: 0; border-radius: 8px; cursor: pointer; }
+  button { background: #222; color: #fff; }
+  pre { background: #f7f7f7; border: 1px solid #e5e5e5; padding: 12px; border-radius: 8px; height: 240px; overflow: auto; }
+  .muted { color: #666; font-size: 0.95em; }
+</style>
+
+<h1>Downloader & Unzipper (.tgz)</h1>
+<p class="muted">Base <code>file_path</code> du serveur : <code id="base">(chargement…)</code></p>
+
+<form id="f">
+  <label for="url">Archive URL (.tgz / .tar.gz)</label>
+  <input id="url" type="url" required
+         value="https://registry.npmjs.org/react/-/react-19.2.0.tgz" />
+
+  <label for="dir">Répertoire cible (relatif à file_path)</label>
+  <input id="dir" type="text" placeholder="ex: downloads" value="downloads" />
+
+  <label for="file">Nom du fichier local</label>
+  <input id="file" type="text" required placeholder="ex: react.tgz" value="react.tgz" />
+
+  <button type="submit">Télécharger → /api/file → /api/unzip</button>
+</form>
+
+<h3>Log</h3>
+<pre id="log"></pre>
+
+<script>
+const logEl = document.getElementById('log');
+function log(...a){ logEl.textContent += a.join(' ') + '\n'; logEl.scrollTop = logEl.scrollHeight; }
+
+async function showBase() {
+  try {
+    const r = await fetch('/api/get-config');
+    const j = await r.json();
+    document.getElementById('base').textContent = j.fileBase || '(inconnu)';
+  } catch {
+    document.getElementById('base').textContent = '(erreur)';
+  }
+}
+showBase();
+
+document.getElementById('f').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const url  = document.getElementById('url').value.trim();
+  const dir  = document.getElementById('dir').value.trim();       // relatif à file_path
+  const file = document.getElementById('file').value.trim();      // simple nom de fichier
+
+  if (!url || !file) { log('❌ URL et nom de fichier requis'); return; }
+
+  try {
+    log('⬇️  Téléchargement:', url);
+    const resp = await fetch(url);
+    if (!resp.ok) { log('❌ Échec download:', resp.status, resp.statusText); return; }
+    const buf = await resp.arrayBuffer();
+    const size = buf.byteLength;
+    log('✅ Archive téléchargée — taille:', size, 'octets');
+
+    // /api/file/<dir>/<file> — POST binaire (octet-stream)
+    const segs = (dir ? dir.split('/').filter(Boolean) : []);
+    segs.push(file);
+    const relEsc = segs.map(encodeURIComponent).join('/');
+
+    log('💾 Écriture via /api/file/', relEsc);
+    const write = await fetch('/api/file/' + relEsc, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: buf
+    });
+
+    if (!write.ok) {
+      const t = await write.text().catch(()=>'(no body)');
+      log('❌ Échec écriture:', write.status, write.statusText, t);
+      return;
+    }
+    const wj = await write.json().catch(()=>null);
+    log('✅ Fichier écrit:', (wj && wj.path) ? wj.path : relEsc);
+
+    // /api/unzip { file, directory }
+    log('🗜️  Décompression via /api/unzip …');
+    const unzip = await fetch('/api/unzip', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file, directory: dir || '' })
+    });
+
+    const uj = await unzip.json().catch(()=>null);
+    if (unzip.ok) {
+      log('✅ Unzip OK:', uj?.message || '', '→ entries:', uj?.extracted);
+    } else {
+      log('❌ Unzip KO:', uj?.message || (unzip.status + ' ' + unzip.statusText));
+    }
+  } catch (err) {
+    log('💥 Erreur:', err?.message || err);
+  }
+});
+</script>

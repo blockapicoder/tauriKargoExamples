@@ -19,6 +19,7 @@ export interface Feature {
 export interface ConexteFeature {
     features: Feature[]
     matDist?: number[][]
+    poids: number []
 }
 export function computeValue(ctx: ConexteFeature, p: number[]) {
     const somme: number[] = []
@@ -41,10 +42,13 @@ export function computeValue(ctx: ConexteFeature, p: number[]) {
     }
     for (let i = 0; i < ctx.features.length; i++) {
         let produit = 1
+        let poid = ctx.poids[i]??1
         for (let j = 0; j < ctx.features.length; j++) {
             if (i != j) {
                 const d = matDist[i][j]
-                produit = produit * Math.sin(Math.PI * (ls[j] / (ls[j] + d)))
+                const lsj = Math.pow(ls[j],poid)
+                const dp =Math.pow(d,poid)
+                produit = produit * Math.sin(Math.PI * (lsj / (lsj + dp)))
             }
         }
         ctx.features[i].s.forEach((v, k) => {
@@ -190,7 +194,7 @@ export function computeMatrixDist(ls: Feature[]): ConexteFeature {
             // }
         }
     }
-    return { features: ls, matDist: r }
+    return { features: ls, matDist: r ,poids:[]}
 }
 
 export function featuresForDist(features: Feature[], p: number[], distFeature: number): Feature[] {

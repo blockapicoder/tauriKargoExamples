@@ -134,3 +134,4 @@ export function creerFunctionRDP(points: Point[]): (x: number, y: number) => num
         return result / s;
     };
 }
+
