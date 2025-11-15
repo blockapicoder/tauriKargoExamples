@@ -1,5 +1,5 @@
 {
   "dependencies": {
-    "@mintplex-labs/piper-tts-web": "^1.0.4"
+    "tauri-kargo-tools": "^0.1.6"
   }
 }
