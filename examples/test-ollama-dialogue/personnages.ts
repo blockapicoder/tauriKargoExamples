@@ -145,36 +145,60 @@ defineVue(ListePersonnage, {
 })
 class Echange {
     personnageA!: string
+    afficherPersonnageA: boolean
+    afficherPersonnageB: boolean
     personnageB!: string
-    space = "..."
-    showSpace = false
+
     constructor() {
+        this.personnageA = ""
+        this.afficherPersonnageA = false;
+        this.personnageB = ""
+        this.afficherPersonnageB = false
 
     }
 }
 defineVue(Echange, {
-    kind: "flow",
-    orientation: "row",
-    width: "100%",
-    gap: 10,
-    children: [
-        {
-            kind: 'label',
-            name: "personnageA",
-            width: "40%"
+    kind: "flow", orientation: "column", children: [{
+        kind: "flow",
+        orientation: "row",
+        width: "100%",
+        gap: 10,
+        children: [
+            {
+                kind: 'label',
+                name: "personnageA",
+                width: "40%",
+                useVisibility: true,
+                visible: "afficherPersonnageA"
 
-        }, {
-            kind: "staticLabel",
-            label: "...",
-            width: "20%",
-            visible:"showSpace" ,
-            useVisibility:true
-        }, {
-            kind: 'label',
-            name: 'personnageB',
-            width: "40%"
-        }
-    ]
+            }, {
+                kind: "space",
+
+                width: "60%"
+
+            }
+        ]
+    },
+    {
+        kind: "flow",
+        orientation: "row",
+        width: "100%",
+        gap: 10,
+        children: [
+            {
+                kind: "space",
+
+                width: "60%"
+
+            }, {
+                kind: 'label',
+                name: 'personnageB',
+                width: "40%",
+                useVisibility: true,
+                visible: "afficherPersonnageB"
+            }
+        ]
+    }]
 })
 class Conversation {
     messagesA: ChatMessage[] = []
@@ -204,25 +228,32 @@ class Conversation {
             return
         }
         this.running = true
+        const echange = new Echange()
+
+        this.echanges = [...this.echanges,echange]
         let r = await chatOllama(this.messagesA, "gemma3-2060", {
-            stream: false,
-            onToken: (t) => { },
+            stream: true,
+            onToken: (t) => { 
+                echange.afficherPersonnageA = true
+                echange.personnageA = echange.personnageA + t },
         });
 
         this.messagesA.push({ role: 'assistant', content: r })
 
         this.messagesB.push({ role: 'user', content: r })
         let r2 = await chatOllama(this.messagesB, "gemma3-2060", {
-            stream: false,
-            onToken: (t) => { },
+            stream: true,
+            onToken: (t) => { 
+                echange.afficherPersonnageB = true;
+                echange.personnageB = echange.personnageB + t },
         });
 
         this.messagesB.push({ role: 'assistant', content: r2 })
         this.messagesA.push({ role: "user", content: r2 })
-        const echange = new Echange()
+
         echange.personnageA = r
         echange.personnageB = r2
-        this.echanges = [...this.echanges, echange]
+
         this.running = false
     }
     demarer() {
@@ -239,6 +270,7 @@ class Conversation {
             return;
         }
         clearInterval(this.interval)
+        this.interval = undefined
     }
     faireAction() {
         if (this.interval === undefined) {
@@ -271,7 +303,9 @@ defineVue(Conversation, {
         {
             kind: "listOfVue",
             list: "echanges",
-            gap: 15
+            gap: 15,
+            style: { overflow:"auto"},
+            height:500
         }
     ]
 })
