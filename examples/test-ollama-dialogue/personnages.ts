@@ -230,12 +230,13 @@ class Conversation {
         this.running = true
         const echange = new Echange()
 
-        this.echanges = [...this.echanges,echange]
+        this.echanges = [...this.echanges, echange]
         let r = await chatOllama(this.messagesA, "gemma3-2060", {
             stream: true,
-            onToken: (t) => { 
+            onToken: (t) => {
                 echange.afficherPersonnageA = true
-                echange.personnageA = echange.personnageA + t },
+                echange.personnageA = echange.personnageA + t
+            },
         });
 
         this.messagesA.push({ role: 'assistant', content: r })
@@ -243,9 +244,10 @@ class Conversation {
         this.messagesB.push({ role: 'user', content: r })
         let r2 = await chatOllama(this.messagesB, "gemma3-2060", {
             stream: true,
-            onToken: (t) => { 
+            onToken: (t) => {
                 echange.afficherPersonnageB = true;
-                echange.personnageB = echange.personnageB + t },
+                echange.personnageB = echange.personnageB + t
+            },
         });
 
         this.messagesB.push({ role: 'assistant', content: r2 })
@@ -304,8 +306,8 @@ defineVue(Conversation, {
             kind: "listOfVue",
             list: "echanges",
             gap: 15,
-            style: { overflow:"auto"},
-            height:500
+            style: { overflow: "auto" },
+            height: 500
         }
     ]
 })
