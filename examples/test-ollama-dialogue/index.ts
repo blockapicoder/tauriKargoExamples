@@ -312,4 +312,4 @@ defineVue(Conversation, {
     ]
 })
 
-boot(new ListePersonnage(), "#app")
+boot(new ListePersonnage())
