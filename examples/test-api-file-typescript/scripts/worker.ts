@@ -1,5 +1,5 @@
 /* Exemple Worker TypeScript */
-declare const self: DedicatedWorkerGlobalScope;
+//declare const self: any;
 export {};
 
 function log(...args:any[]) {

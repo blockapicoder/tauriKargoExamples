@@ -6,3 +6,5 @@
 /examples/test-threejs-montagne/node_modules
 /examples/test-ollama-dialogue/node_modules
 /examples/test-api-file/node_modules
+/examples/test-api-explorer/node_modules
+/examples/test-api-file-typescript/node_modules
