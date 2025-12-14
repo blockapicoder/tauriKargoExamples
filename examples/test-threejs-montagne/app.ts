@@ -16,6 +16,7 @@ export class PlacerPoints {
 
     canvas!: HTMLCanvasElement
     ctx!: CanvasRenderingContext2D
+    montagne!: Montagne
     points: Point[] = []
     selection?: Point;
     mouseDown = false
@@ -153,6 +154,9 @@ export class PlacerPoints {
 
     }
     drawGrid2D() {
+        this.montagne.setPoints( this.points.map( (p,idx)=> {
+            return { x:p.x,y:p.y,h:p.h,id:idx}
+        }), this.points.indexOf(this.selection!))
         this.fitCanvasToParent();
         const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
         console.log("client", w, h)
@@ -212,12 +216,12 @@ defineVue(PlacerPoints, {
    // width: "100%",
     height: "100vh",
     width:"50vw",
+    gap:5,
 
 
     children: [
         { kind: "staticButton", action: "supprimerPoint", enable: "peutSupprimerPoint", label: "Supprimer", },
-        { kind: "custom", factory: "createCanvas", init: "initCanvas" },
-        { kind: "label", name: "label" }
+        { kind: "custom", factory: "createCanvas", init: "initCanvas" }
     ]
 }, {
     init: "init"
@@ -227,13 +231,16 @@ class T {
     p2: Montagne
     constructor() {
         this.p1 = new PlacerPoints()
+       
         this.p2 = new Montagne()
+         this.p1.montagne = this.p2
     }
 }
 defineVue(T, {
     orientation: "row",
     kind: "flow",
-   // height: "100vh",
+    height: "100vh",
+
     children: [{
         kind: "singleVue",
         name: "p1"

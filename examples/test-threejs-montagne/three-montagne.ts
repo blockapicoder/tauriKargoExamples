@@ -3,7 +3,7 @@ import { ParametricGeometry } from 'three/examples/jsm/Addons.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { updateFormulaPanel } from './formule';
 import { creerFunction, Point, TypeFonction } from './spi';
-import { defineVue } from 'tauri-kargo-tools/vue.js';
+import { defineVue } from './node_modules/tauri-kargo-tools/src/vue';
 
 interface P {
   id: number;
@@ -18,10 +18,10 @@ export class Montagne {
   ];
   currentSelection: number = 0
   tf: TypeFonction = "SIN"
-  sel:number []=[]
+  sel: number[] = [1]
   types: TypeFonction[] = ["DP", "SIN", "RDP"];
 
-  display( t:TypeFonction):string {
+  display(t: TypeFonction): string {
     return t
   }
 
@@ -33,12 +33,13 @@ export class Montagne {
   controlPointsGroup !: THREE.Group
   mesh!: THREE.Mesh
   div!: HTMLDivElement
-  createDiv():HTMLDivElement {
-    this.div=  document.createElement("div")
+  createDiv(): HTMLDivElement {
+    this.div = document.createElement("div")
     return this.div
   }
   initThree() {
-
+    this.setData([{ x: 0.5, y: 0.5, h: 5, id: 0 }, { x: 1, y: 1, h: 5, id: 0 }])
+    this.creerFunction()
     this.scene = new THREE.Scene();
 
     // Lumières
@@ -189,16 +190,22 @@ export class Montagne {
       console.log(p.y, this.F(p.value.x, p.value.y));
     }
   }
-  setPoints(ls: P[], selection: number) {
+  setData(ls: P[]) {
     const newData: Point[] = ls.map((p) => {
       return {
-        value: new THREE.Vector2(p.x / 10, p.y / 10),
+        value: new THREE.Vector2(p.x * 100, p.y * 100),
         y: p.h,
       };
     });
     this.data = newData
+  }
+  setPoints(ls: P[], selection: number) {
+    if (!this.geometry) {
+      return;
+    }
+    this.setData(ls)
     this.currentSelection = selection
-    this.F = creerFunction(this.tf, newData);
+    this.F = creerFunction(this.tf, this.data);
     this.geometry.dispose();
     this.geometry = new ParametricGeometry(
       (u, v, vec) => {
@@ -213,8 +220,8 @@ export class Montagne {
       50
     );
     this.mesh.geometry = this.geometry;
-    this.drawControlPoints(newData, selection);
-    for (let p of newData) {
+    this.drawControlPoints(this.data, selection);
+    for (let p of this.data) {
       console.log(p.y, this.F(p.value.x, p.value.y));
     }
   }
@@ -226,21 +233,24 @@ export class Montagne {
 
 
 
-defineVue(Montagne, (vue)=> {
+defineVue(Montagne, (vue) => {
   vue.flow({
-    orientation:"column",
-    width:"50vw"
-  
-  },()=> {
-    vue.select({ 
-      list:"types",
-      displayMethod:"display",
-      selection:"sel",
-      update:"setTypeFonction"
+    orientation: "column",
+    width: "50vw",
+    gap: 5,
+    height:'100vh'
+
+  }, () => {
+    vue.select({
+      list: "types",
+      displayMethod: "display",
+      selection: "sel",
+      update: "setTypeFonction",
+      mode: "dropdown"
     })
-    vue.custom( {
-        factory:"createDiv",
-        init:"initThree"
+    vue.custom({
+      factory: "createDiv",
+      init: "initThree"
     })
   })
 
