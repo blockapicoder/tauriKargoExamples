@@ -3,13 +3,13 @@ import * as THREE from 'three';
 
 export type TypeFonction = "DP"|"RDP"|"SIN"
 // Types (compatibles)
-export interface Point {
-    value: THREE.Vector2;
+export interface PointFeature<T> {
+    value: T;
     y: number;
 }
 
 // Distance euclidienne au carré dans R^2
-function D(a: THREE.Vector2, b: THREE.Vector2): number {
+export function distance(a: THREE.Vector2, b: THREE.Vector2): number {
     let d = a.distanceToSquared(b);
     return d;
 }
@@ -22,18 +22,19 @@ function dirFromLonLat(lon: number, lat: number): THREE.Vector3 {
 function DS(a: THREE.Vector2, b: THREE.Vector2) {
     return dirFromLonLat(a.x, a.y).distanceToSquared(dirFromLonLat(b.x, b.y))
 }
-export function creerFunction( type:TypeFonction ,points: Point[]): (x: number, y: number) => number {
+export function creerFunction<T>( type:TypeFonction ,points: PointFeature<T>[],D:(a: T, b:T)=>number ): (p:T) => number {
+  
     if (type ==="SIN") {
-        return creerFunctionSinus(points)
+        return creerFunctionSinus(points,D)
     }
     if (type ==="DP") {
-        return creerFunctionDP(points)
+        return creerFunctionDP(points,D)
     }
-    return creerFunctionRDP(points)
+    return creerFunctionRDP(points,D)
 
 }
 /** === 1) Schéma SIN (ton schéma d'origine) — inchangé ==================== */
-export function creerFunctionSinus(points: Point[]): (x: number, y: number) => number {
+export function creerFunctionSinus<T>(points: PointFeature<T>[],D:(a:T, b: T)=>number): (p:T) => number {
     const m: number[][] = [];
 
     for (let i = 0; i < points.length; i++) {
@@ -44,8 +45,8 @@ export function creerFunctionSinus(points: Point[]): (x: number, y: number) => n
         }
     }
 
-    return (x: number, y: number): number => {
-        const p: THREE.Vector2 = new THREE.Vector2(x, y);
+    return (p:T): number => {
+     
         let result = 0;
         let s = 0;
 
@@ -72,9 +73,9 @@ export function creerFunctionSinus(points: Point[]): (x: number, y: number) => n
 /** === 2) Schéma DP : φ_i(p) = ∏_{j≠i} r_j(p) ==============================
  *  Invariance similitude, interpolation exacte, combinaison convexe.
  */
-export function creerFunctionDP(points: Point[]): (x: number, y: number) => number {
-    return (x: number, y: number): number => {
-        const p = new THREE.Vector2(x, y);
+export function creerFunctionDP<T>(points: PointFeature<T>[],D:(a:T, b: T)=>number): (p:T) => number {
+    return (p:T): number => {
+
         let result = 0;
         let s = 0;
 
@@ -104,9 +105,9 @@ export function creerFunctionDP(points: Point[]): (x: number, y: number) => numb
 /** === 3) Schéma RDP : φ_i(p) = ∏_{j≠i} r_j(p) / (r_i(p) + r_j(p)) ==========
  *  Invariance similitude, interpolation exacte, combinaison convexe.
  */
-export function creerFunctionRDP(points: Point[]): (x: number, y: number) => number {
-    return (x: number, y: number): number => {
-        const p = new THREE.Vector2(x, y);
+export function creerFunctionRDP<T>(points: PointFeature<T>[],D:(a: T, b: T)=>number): (p:T) => number {
+    return (p:T): number => {
+
         let result = 0;
         let s = 0;
 

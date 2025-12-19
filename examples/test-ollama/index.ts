@@ -1,10 +1,13 @@
 // ask-ollama-chat.ts
 // Remplace l'ancien "ask-ollama.ts" pour utiliser le mode CHAT d'Ollama (/api/chat)
+import { generateWithLogprobs } from "./logprob-test";
 import { parseNDJSON, chatOllama, ChatRequest } from "./ollama"
 
 const model: string = "gemma3-2060";
 
 (async () => {
+  const r1 = await generateWithLogprobs("Écris une phrase courte en français.")
+  document.body.append(JSON.stringify(r1, null, 2))
   const req: ChatRequest = {
     messages: [{ role: 'user', content: 'bonjour' }],
 

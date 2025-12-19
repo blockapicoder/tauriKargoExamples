@@ -1,9 +1,7 @@
-import { boot, defineVue } from "./node_modules/tauri-kargo-tools/src/vue"
-import { PlacerPointsPourPlanete } from "./planete";
-import { Montagne } from "./three-montagne";
-import { Planete } from "./three-planete";
+import { Vector2 } from "three";
+import { defineVue } from "./node_modules/tauri-kargo-tools/src/vue";
+import { creerFunction, distance, PointFeature, TypeFonction } from "./spi";
 
-// rayon visuel du point 2D
 
 interface Point {
     x: number
@@ -11,15 +9,16 @@ interface Point {
     h: number
 
 }
-
-
-export class PlacerPoints {
+export class PlacerPointsPourPlanete {
     nx = 10
     ny = 10
     R = 0.02;
+    tf: TypeFonction = "SIN"
+    sel: number[] = [1]
+    types: TypeFonction[] = ["DP", "SIN", "RDP"];
     canvas!: HTMLCanvasElement
     ctx!: CanvasRenderingContext2D
-    montagne!: Montagne
+
     points: Point[] = []
     selection?: Point;
     mouseDown = false
@@ -110,17 +109,7 @@ export class PlacerPoints {
                 this.drawGrid2D()
             }
         });
-        this.canvas.addEventListener('wheel', (e) => {
 
-            const dir = e.deltaY < 0 ? 1 : -1;
-            const mult = e.shiftKey ? 5 : 1;
-            if (this.selection) {
-                this.selection.h += dir
-
-                this.drawGrid2D()
-            }
-
-        }, { passive: false });
 
     }
     fitCanvasToParent() {
@@ -156,53 +145,102 @@ export class PlacerPoints {
         }
 
     }
+    drawPlanete() {
+        //this.drawGrid2D()
+        const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+        const centerX = w / 2
+        const centerY = h / 2
+        const r = Math.min(centerX, centerY) / 2
+        const list: PointFeature<Vector2>[] = []
+
+
+
+
+        for (const p of this.points) {
+            const x = p.x * w
+            const y = p.y * h
+
+            const nx = x - centerX;
+            const ny = y - centerY;
+            const n = Math.sqrt(nx * nx + ny * ny)
+            const pf: PointFeature<Vector2> = {
+                value: new Vector2(r * nx / n, r * ny / n),
+                y: n - r
+            }
+
+            list.push(pf)
+
+        }
+    
+        const f = creerFunction(this.tf, list,distance)
+        const nbPoint = 150
+        this.ctx.strokeStyle = '#e5e5e5';
+        this.ctx.beginPath();
+        for (let k = 0; k <= nbPoint; k++) {
+
+            const a = 2 * Math.PI * k / nbPoint
+            const ca = Math.cos(a)
+            const sa = Math.sin(a)
+            let px = ca * r
+            let py = sa * r
+            let hr = f(new Vector2(px, py))
+            let ax = px + ca * hr+centerX
+            let ay = py + sa * hr+centerY
+            if (k === 0) {
+                this.ctx.moveTo(ax, ay)
+            } else {
+                this.ctx.lineTo(ax, ay)
+            }
+
+        }
+        this.ctx.stroke();
+
+    }
     drawGrid2D() {
-        this.montagne.setPoints(this.points.map((p, idx) => {
-            return { x: p.x, y: p.y, h: p.h, id: idx }
-        }), this.points.indexOf(this.selection!))
+
         this.fitCanvasToParent();
         const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
         console.log("client", w, h)
         console.log(this.canvas.width, this.canvas.height)
 
 
-        const dx = w / this.nx;
-        const dy = h / this.ny;
+
         this.ctx.save();
         this.ctx.clearRect(0, 0, w, h);
         this.ctx.lineWidth = 1;
         this.ctx.strokeStyle = '#e5e5e5';
-        for (let x = 0; x <= this.nx; x += 1) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(x * dx, 0);
-            this.ctx.lineTo(x * dx, h);
-            this.ctx.stroke();
-        }
-        for (let y = 0; y <= this.ny; y += 1) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(0, y * dy);
-            this.ctx.lineTo(w, y * dy);
-            this.ctx.stroke();
-        }
+        const centerX = w / 2
+        const centerY = h / 2
+        const r = Math.min(centerX, centerY) / 2
+        this.ctx.beginPath();
+        this.ctx.arc(centerX, centerY, r, 0, 2 * Math.PI)
+        this.ctx.stroke();
+
+
 
 
 
         for (const p of this.points) {
-
             const x = p.x * w
             const y = p.y * h
+
+
+
             this.ctx.strokeStyle = this.selection === p ? "blue" : "red"
 
             this.ctx.beginPath();
             this.ctx.arc(x, y, this.R * w, 0, 2 * Math.PI)
             this.ctx.stroke();
-            this.ctx.font = `${dx / 4}px Arial`
-
-            this.ctx.fillStyle = "blue"
-            this.ctx.fillText(`${p.h}`, x - this.R * w / 2, y + this.R * w / 2)
-
-
         }
+
+
+
+
+
+        this.drawPlanete()
+
+
+
 
         this.ctx.strokeStyle = "green"
         this.ctx.beginPath();
@@ -210,10 +248,17 @@ export class PlacerPoints {
         this.ctx.stroke();
         this.ctx.restore();
     }
+    setTypeFonction() {
+        this.tf = this.types[this.sel[0]]
+        this.drawGrid2D()
+    }
+    display(t: TypeFonction): string {
+        return t
+    }
+
 
 }
-
-defineVue(PlacerPoints, {
+/*defineVue(PlacerPointsPourPlanete, {
     kind: "flow",
     orientation: "column",
     // width: "100%",
@@ -229,111 +274,33 @@ defineVue(PlacerPoints, {
     ]
 }, {
     init: "init"
-})
-class MontagneEditeur {
-    titrePagePrincipal = "Page principal"
-    pagePrincipal() {
-        return new PagePrincpal()
-    }
-    p1: PlacerPoints
-    p2: Montagne
-    constructor() {
-        this.p1 = new PlacerPoints()
+})*/
+defineVue(PlacerPointsPourPlanete, (vue) => {
+    vue.flow({
+        orientation: "column", width: "50vw",
+        gap: 5,
+        height: "90vh"
+    }, () => {
 
-        this.p2 = new Montagne()
-        this.p1.montagne = this.p2
-    }
+        vue.flow({ orientation: "row" }, () => {
+            vue.staticButton({ action: "supprimerPoint", enable: "peutSupprimerPoint", label: "Supprimer", width: "50%" })
+            vue.select({
+                list: "types",
+                displayMethod: "display",
+                selection: "sel",
+                update: "setTypeFonction",
+                mode: "dropdown"
+                , width: "50%"
+            })
+      
+        })
+
+        vue.custom({ factory: "createCanvas", init: "initCanvas", height: "90%" })
+
+    })
+}), {
+    init: "init"
 }
-defineVue(MontagneEditeur, {
-    kind: "flow",
-    orientation: "column",
-    height: "99vh",
-    gap: "1vh",
-    // width: "100vh",
-    children: [
-        {
-            kind: "bootVue",
-            factory: "pagePrincipal",
-            label: "titrePagePrincipal",
-
-
-        },
-        {
-            orientation: "row",
-            kind: "flow",
-
-            height: '90%',
-
-
-            children: [{
-                kind: "singleVue",
-                name: "p1"
-            }, {
-                kind: "singleVue",
-                name: "p2"
-            }]
-        }
-    ]
-})
-export class PlaneteEditeur {
-    titrePagePrincipal = "Page principal"
-    placerPointsPourPlanete!: PlacerPointsPourPlanete
-    planete!: Planete
-    constructor() {
-        this.placerPointsPourPlanete = new PlacerPointsPourPlanete()
-        this.planete = new Planete()
-    }
-    pagePrincipal() {
-        return new PagePrincpal()
-    }
-
-
-}
-defineVue(PlaneteEditeur, {
-    kind: "flow",
-    orientation: "column",
-    children: [
-        { kind: "bootVue", factory: "pagePrincipal", label: "titrePagePrincipal", width: "100%" },
-        {
-            kind: "flow",
-            orientation: "row",
-            children: [
-                {
-                    kind: "singleVue",
-                    name: "placerPointsPourPlanete"
-                }
-
-                ,
-                {
-                    kind: "singleVue",
-                    name: "planete"
-                }
-            ]
-        }
 
 
 
-    ]
-})
-class PagePrincpal {
-    titreMontagneEditeur = "Montagne editeur"
-    titrePlaneteEditeur = "Planete editeur"
-    montagneEditeur() {
-        return new MontagneEditeur()
-    }
-    planeteEditeur() {
-        return new PlaneteEditeur()
-    }
-
-
-
-}
-defineVue(PagePrincpal, {
-    kind: "flow",
-    orientation: "row",
-    children: [
-        { kind: "bootVue", factory: "montagneEditeur", label: "titreMontagneEditeur", width: "50%" },
-        { kind: "bootVue", factory: "planeteEditeur", label: "titrePlaneteEditeur", width: "50%" },
-    ]
-})
-boot(new PagePrincpal())

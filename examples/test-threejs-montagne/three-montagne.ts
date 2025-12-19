@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { ParametricGeometry } from 'three/examples/jsm/Addons.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { updateFormulaPanel } from './formule';
-import { creerFunction, Point, TypeFonction } from './spi';
+import { creerFunction, distance, PointFeature, TypeFonction } from './spi';
 import { defineVue } from './node_modules/tauri-kargo-tools/src/vue';
 
 interface P {
@@ -13,7 +13,7 @@ interface P {
 }
 
 export class Montagne {
-  data: Point[] = [
+  data: PointFeature<THREE.Vector2>[] = [
 
   ];
   currentSelection: number = 0
@@ -25,9 +25,9 @@ export class Montagne {
     return t
   }
 
-  F!: (x: number, y: number) => number
+  F!: (p: THREE.Vector2) => number
   creerFunction() {
-    this.F = creerFunction(this.tf, this.data)
+    this.F = creerFunction(this.tf, this.data, distance)
   }
   scene!: THREE.Scene
   controlPointsGroup !: THREE.Group
@@ -89,7 +89,7 @@ export class Montagne {
       (u, v, vec) => {
         const x = 100 * u;
         const y = 100 * v;
-        const z = this.F(x, y);
+        const z = this.F(new THREE.Vector2(x,y));
         vec.setX(x / 10 - 5);
         vec.setZ(y / 10 - 5);
         vec.setY(z / 10);
@@ -138,7 +138,7 @@ export class Montagne {
 
 
   }
-  drawControlPoints(points: Point[], selection: number) {
+  drawControlPoints(points: PointFeature<THREE.Vector2>[], selection: number) {
     this.controlPointsGroup.clear();
     const sphereGeom = new THREE.SphereGeometry(0.07, 16, 16);
     const sphereMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
@@ -155,7 +155,7 @@ export class Montagne {
       // x' = x/10 - 5 ; z' = y/10 - 5 ; y' = F(x,y)/10
       const xScene = p.value.x / 10 - 5;
       const zScene = p.value.y / 10 - 5;
-      const yScene = this.F(p.value.x, p.value.y) / 10;
+      const yScene = this.F(new THREE.Vector2(p.value.x, p.value.y)) / 10;
       s.position.set(xScene, yScene, zScene);
 
       this.controlPointsGroup.add(s);
@@ -176,7 +176,7 @@ export class Montagne {
       (u, v, vec) => {
         const x = 100 * u;
         const y = 100 * v;
-        const z = this.F(x, y);
+        const z = this.F(new THREE.Vector2( x, y));
         vec.setX(x / 10 - 5);
         vec.setZ(y / 10 - 5);
         vec.setY(z / 10);
@@ -186,12 +186,10 @@ export class Montagne {
     );
     this.mesh.geometry = this.geometry;
     this.drawControlPoints(this.data, this.currentSelection);
-    for (let p of this.data) {
-      console.log(p.y, this.F(p.value.x, p.value.y));
-    }
+ 
   }
   setData(ls: P[]) {
-    const newData: Point[] = ls.map((p) => {
+    const newData: PointFeature<THREE.Vector2>[] = ls.map((p) => {
       return {
         value: new THREE.Vector2(p.x * 100, p.y * 100),
         y: p.h,
@@ -205,13 +203,13 @@ export class Montagne {
     }
     this.setData(ls)
     this.currentSelection = selection
-    this.F = creerFunction(this.tf, this.data);
+    this.F = creerFunction(this.tf, this.data,distance);
     this.geometry.dispose();
     this.geometry = new ParametricGeometry(
       (u, v, vec) => {
         const x = 100 * u;
         const y = 100 * v;
-        const z = this.F(x, y);
+        const z = this.F(new THREE.Vector2(x, y));
         vec.setX(x / 10 - 5);
         vec.setZ(y / 10 - 5);
         vec.setY(z / 10);
@@ -222,7 +220,7 @@ export class Montagne {
     this.mesh.geometry = this.geometry;
     this.drawControlPoints(this.data, selection);
     for (let p of this.data) {
-      console.log(p.y, this.F(p.value.x, p.value.y));
+      console.log(p.y, this.F(new THREE.Vector2(p.value.x, p.value.y)));
     }
   }
 
@@ -238,7 +236,8 @@ defineVue(Montagne, (vue) => {
     orientation: "column",
     width: "50vw",
     gap: 5,
-    height:'100vh'
+
+    height: "90vh",
 
   }, () => {
     vue.select({
@@ -250,7 +249,9 @@ defineVue(Montagne, (vue) => {
     })
     vue.custom({
       factory: "createDiv",
-      init: "initThree"
+      init: "initThree",
+      height: "90%"
+
     })
   })
 

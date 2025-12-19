@@ -2,10 +2,10 @@ import * as THREE from 'three';
 import { ParametricGeometry } from 'three/examples/jsm/Addons.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { updateFormulaPanel } from './formule';
-import { creerFunction, Point, TypeFonction } from './spi';
+import { creerFunction, PointFeature, TypeFonction } from './spi';
 let tf: TypeFonction = "SIN"
 let currentSelection: number = 0
-let data: Point[] = [
+let data: PointFeature[] = [
  
 ];
 let F = creerFunction(tf, data);
@@ -79,7 +79,7 @@ const controlPointsGroup = new THREE.Group();
 meshAndControlPointsGroup.add(controlPointsGroup);
 scene.add(meshAndControlPointsGroup);
 
-function drawControlPoints(points: Point[], selection: number) {
+function drawControlPoints(points: PointFeature[], selection: number) {
   controlPointsGroup.clear();
   const sphereGeom = new THREE.SphereGeometry(0.07, 16, 16);
   const sphereMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
@@ -136,7 +136,7 @@ export function setTypeFonction() {
   }
 }
 export function setPoints(ls: P[], selection: number) {
-  const newData: Point[] = ls.map((p) => {
+  const newData: PointFeature[] = ls.map((p) => {
     return {
       value: new THREE.Vector2(p.x / 10, p.y / 10),
       y: p.h,
