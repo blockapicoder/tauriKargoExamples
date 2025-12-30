@@ -5,8 +5,10 @@ import { updateFormulaPanel } from './formule';
 import { creerFunction, distance, PointFeature, TypeFonction } from './spi';
 import { defineVue } from './node_modules/tauri-kargo-tools/src/vue';
 import { PlaneteEditeur } from './app';
+import { ChoixCouleur, SelectionCouleur } from './menu-couleur';
+import { PlaneteNavigation } from './three-planete-navigation';
 
-
+import { createClient, TauriKargoClient } from "./node_modules/tauri-kargo-tools/src/api";
 // MarkerSelection.ts (ou dans le même fichier)
 
 
@@ -63,7 +65,11 @@ export class MarkerSelection {
   }
 }
 
-
+interface ColorFeature {
+  r: PointFeature<THREE.Vector3>[],
+  g: PointFeature<THREE.Vector3>[],
+  b: PointFeature<THREE.Vector3>[]
+}
 
 
 export class SphereMarkerTool {
@@ -77,7 +83,8 @@ export class SphereMarkerTool {
   public markerRadius = 0.08;
   public wheelStep = 0.03; // distance par "cran" molette
   public minOffset = 0; // autorise un léger enfoncement dans la sphère
-  public maxOffset = 2.0;  // éloignement max
+  public maxOffset = 2.0;  // éloignement max*
+  mapMarker: Map<Marker, THREE.Vector3> = new Map()
 
   /**
    * @param sphereMesh Mesh de la "grosse" sphère (celle qu'on clique)
@@ -94,8 +101,9 @@ export class SphereMarkerTool {
     private readonly baseRadius: number
   ) {
     this.selection.planete = planete
-    this.sphereMesh.add(this.markers); 
+    this.sphereMesh.add(this.markers);
     const el = this.renderer.domElement;
+
     el.addEventListener("pointerdown", this.onPointerDown);
     //  el.addEventListener("wheel", this.onWheel, { passive: false });
   }
@@ -136,6 +144,7 @@ export class SphereMarkerTool {
 
     const hit = sphereHits[0];
     this.createMarkerAt(hit.point);
+    this.selection.planete.saveMarkers()
   };
 
   private onWheel = (e: WheelEvent) => {
@@ -162,28 +171,31 @@ export class SphereMarkerTool {
     this.ndc.y = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
   }
 
- private createMarkerAt(worldPoint: THREE.Vector3) {
-  // hit.point est WORLD -> on passe en LOCAL de la sphère
-  const localPoint = this.sphereMesh.worldToLocal(worldPoint.clone());
+  createMarkerAt(worldPoint: THREE.Vector3) {
+    // hit.point est WORLD -> on passe en LOCAL de la sphère
+    const localPoint = this.sphereMesh.worldToLocal(worldPoint.clone());
 
-  // direction radiale LOCALE (centre = 0,0,0)
-  const dirUnit = localPoint.clone().normalize();
+    // direction radiale LOCALE (centre = 0,0,0)
+    const dirUnit = localPoint.clone().normalize();
 
-  // rayon de la surface déformée à cette direction
-  const drSurface = this.selection.planete.F? this.selection.planete.F(dirUnit):0
-  const rSurface = this.baseRadius + drSurface;
+    // rayon de la surface déformée à cette direction
+    const drSurface = this.selection.planete.F ? this.selection.planete.F(dirUnit) : 0
+    const rSurface = this.baseRadius + drSurface;
 
-  const marker = this.selection.createMarker(this.markerRadius);
+    const marker = this.selection.createMarker(this.markerRadius);
+    this.mapMarker.set(marker, worldPoint)
 
-  marker.userData.dir = dirUnit;     // direction unitaire locale
-  marker.userData.offset = drSurface;        // offset "y" du marqueur vs surface
+    marker.userData.color = this.selection.planete.couleurCourante
+    marker.userData.dir = dirUnit;     // direction unitaire locale
+    marker.userData.offset = drSurface;        // offset "y" du marqueur vs surface
 
-  // position initiale : sur la surface déformée (offset=0)
-  marker.position.copy(dirUnit).multiplyScalar(rSurface);
+    // position initiale : sur la surface déformée (offset=0)
+    marker.position.copy(dirUnit).multiplyScalar(rSurface);
 
-  this.markers.add(marker);
-  this.selection.select(marker);
-}
+    this.markers.add(marker);
+    this.selection.select(marker);
+    return marker
+  }
 
 
   private updateMarkerPosition(marker: Marker) {
@@ -199,7 +211,7 @@ export class SphereMarkerTool {
   public deleteSelectedMarker(): boolean {
     const m = this.getSelectedMarker();
     if (!m) return false;
-
+    this.mapMarker.delete(m)
     // 1) désélectionner (restaure la couleur, évite référence pendante)
     // On doit appeler selection.select(null) (donc expose une méthode pour ça)
     this.selection.select(null);
@@ -212,6 +224,11 @@ export class SphereMarkerTool {
     m.material.dispose();
 
     return true;
+  }
+  public setSelectedMarkerColor(color: THREE.Color) {
+    const m = this.getSelectedMarker();
+    if (!m) return false;
+    m.userData.color = color
   }
   public moveSelectedMarker(delta: number): boolean {
     const m = this.getSelectedMarker();
@@ -231,17 +248,43 @@ export class SphereMarkerTool {
     const m = this.getSelectedMarker();
     if (!m) return false;
 
+    this.setMarkerOffset(m, offset)
+
+
+    return true;
+  }
+  setMarkerOffset(m: Marker, offset: number) {
     const clamped = Math.max(this.minOffset, Math.min(this.maxOffset, offset));
     m.userData.offset = clamped;
     this.updateMarkerPosition(m);
-    return true;
   }
 
   public getSelectedMarkerOffset(): number | null {
     const m = this.getSelectedMarker();
     if (!m) return null;
     return (m.userData.offset as number) ?? 0;
-  } public getAllPointFeatures(): PointFeature<THREE.Vector3>[] {
+  }
+
+  public getAllMarkerData(): MarkerData[] {
+    const out: MarkerData[] = []
+    for (const obj of this.markers.children) {
+      const m = obj as Marker;
+      const storedDir = m.userData.dir as THREE.Vector3;
+      const color = m.userData.color as THREE.Color
+      const offset = (m.userData.offset as number) ?? 0;
+      const md: MarkerData = {
+        color: { x: color.r, y: color.g, z: color.b },
+        dir: { x: storedDir.x, y: storedDir.y, z: storedDir.z },
+        h: offset,
+        worldPos: this.mapMarker.get(m)!
+
+      }
+      out.push(md)
+    }
+    return out
+
+  }
+  public getAllPointFeatures(): PointFeature<THREE.Vector3>[] {
     const out: PointFeature<THREE.Vector3>[] = [];
 
     for (const obj of this.markers.children) {
@@ -264,17 +307,41 @@ export class SphereMarkerTool {
 
     return out;
   }
+  public getAllColorFeatures(): ColorFeature {
+    const out: ColorFeature = { b: [], g: [], r: [] }
 
+    for (const obj of this.markers.children) {
+      const m = obj as Marker;
+
+      const dirUnit = new THREE.Vector3();
+      const storedDir = m.userData.dir as THREE.Vector3 | undefined;
+
+      if (storedDir) {
+        dirUnit.copy(storedDir).normalize();
+      } else {
+        // fallback : derive depuis position locale du marqueur
+        dirUnit.copy(m.position).normalize();
+      }
+
+      const offset = m.userData.color as THREE.Color
+
+      out.r.push({ value: dirUnit, y: offset.r });
+      out.g.push({ value: dirUnit, y: offset.g });
+      out.b.push({ value: dirUnit, y: offset.b });
+    }
+
+    return out;
+  }
 
 
 
 }
 
-interface P {
-  id: number;
-  x: number;
-  y: number;
-  h: number;
+interface MarkerData {
+  color: THREE.Vector3Like
+  worldPos: THREE.Vector3Like
+  dir: THREE.Vector3Like
+  h: number
 }
 
 
@@ -299,6 +366,12 @@ export function captureDeformBase(
   };
 }
 
+interface Interpolation {
+  f: (dirUnit: THREE.Vector3) => number,
+  r: (dirUnit: THREE.Vector3) => number,
+  g: (dirUnit: THREE.Vector3) => number,
+  b: (dirUnit: THREE.Vector3) => number
+}
 /**
  * p' = center + dir * (baseRadius + f(dir))
  * avec dir = normalize(p0 - center)
@@ -306,16 +379,22 @@ export function captureDeformBase(
 export function applyRadialDeformFromBase(
   geom: THREE.BufferGeometry,
   base: DeformBase,
-  f: (dirUnit: THREE.Vector3) => number
+  interpolation: Interpolation
 ) {
   const pos = geom.getAttribute("position") as THREE.BufferAttribute;
   if (!pos || pos.itemSize !== 3) throw new Error("Missing/invalid position attribute.");
+  let color = geom.getAttribute("color") as THREE.BufferAttribute;
 
   const arr = pos.array as Float32Array;
   const baseArr = base.basePositions;
   const c = base.centerLocal;
 
   const dir = new THREE.Vector3();
+
+  const colors = color.array // r,g,b pour chaque sommet
+
+
+
 
   for (let i = 0; i < pos.count; i++) {
     const ix = i * 3;
@@ -329,8 +408,11 @@ export function applyRadialDeformFromBase(
     if (len === 0) continue;
     dir.multiplyScalar(1 / len);
 
-    const dr = f(dir);
-
+    const dr = interpolation.f(dir);
+    color.setXYZ(i, interpolation.r(dir), interpolation.g(dir), interpolation.b(dir))
+    /* colors[ix + 0] =0;//interpolation.r(dir);
+     colors[ix + 1] =0.2;// interpolation.g(dir);
+     colors[ix + 2] =0;// interpolation.b(dir);*/
     const r2 = base.baseRadius + dr;
 
     // nouveau point (recentré)
@@ -340,6 +422,7 @@ export function applyRadialDeformFromBase(
   }
 
   pos.needsUpdate = true;
+  color.needsUpdate = true;
   geom.computeVertexNormals();
   geom.computeBoundingSphere();
   geom.computeBoundingBox();
@@ -348,14 +431,15 @@ export function applyRadialDeformFromBase(
 
 
 export class Planete {
-  data: PointFeature<THREE.Vector2>[] = [
-
-  ];
+  data: PointFeature<THREE.Vector2>[] = [];
   base!: DeformBase
   currentSelection: number = 0
   tf: TypeFonction = "SIN"
   sel: number[] = [1]
   types: TypeFonction[] = ["DP", "SIN", "RDP"];
+  choixCouleur!: ChoixCouleur
+  couleurCourante = new THREE.Color("#FF0000")
+  client: TauriKargoClient = createClient()
 
   display(t: TypeFonction): string {
     return t
@@ -363,17 +447,67 @@ export class Planete {
   markerSelectionne = false
   F!: (p: THREE.Vector3) => number
 
+
+  choisirCouleur(): ChoixCouleur {
+    this.choixCouleur = new ChoixCouleur()
+    this.choixCouleur.planete = this
+    return this.choixCouleur
+
+
+  }
+  saveMarkers() {
+    const data = this.tool.getAllMarkerData()
+    this.client.writeFileText("planete.json", JSON.stringify(data))
+
+
+  }
+  async loadMarkers() {
+    try {
+      const s = await this.client.readFileText("planete.json")
+      const data: MarkerData[] = JSON.parse(s)
+      for (const d of data) {
+        const m = this.tool.createMarkerAt(new THREE.Vector3(d.worldPos.x, d.worldPos.y, d.worldPos.z))
+        const color = new THREE.Color()
+        color.setRGB(d.color.x, d.color.y, d.color.z)
+        m.userData.color = color
+
+        m.userData.dir = new THREE.Vector3(d.dir.x, d.dir.y, d.dir.z)
+
+        this.tool.setMarkerOffset(m, d.h)
+
+      }
+      this.tranformSphere()
+
+    } catch (e) {
+
+    }
+
+
+  }
+
   tranformSphere() {
     const feature = this.tool.getAllPointFeatures()
+    const colorFeature = this.tool.getAllColorFeatures()
+    const c: THREE.Vector3 = this.base.centerLocal
+    console.log("center", c)
+
 
     const distance = (a: THREE.Vector3, b: THREE.Vector3) => {
+
+
       return a.distanceToSquared(b)
     }
     this.F = creerFunction(this.tf, feature, distance)
     for (const f of feature) {
       console.log(f.value, this.F(f.value), f.y)
     }
-    applyRadialDeformFromBase(this.geometry, this.base, this.F)
+    const interpolation: Interpolation = {
+      f: this.F,
+      r: creerFunction(this.tf, colorFeature.r, distance),
+      g: creerFunction(this.tf, colorFeature.g, distance),
+      b: creerFunction(this.tf, colorFeature.b, distance)
+    }
+    applyRadialDeformFromBase(this.geometry, this.base, interpolation)
 
 
 
@@ -381,11 +515,13 @@ export class Planete {
   eloignerDuCentre() {
     this.tool.moveSelectedMarker(0.1)
     this.tranformSphere()
+    this.saveMarkers()
 
   }
   raprocherDuCentre() {
     this.tool.moveSelectedMarker(-0.1)
     this.tranformSphere()
+    this.saveMarkers()
   }
   supprimer() {
 
@@ -394,6 +530,7 @@ export class Planete {
       if (this.tool.deleteSelectedMarker()) {
         this.markerSelectionne = false
         this.tranformSphere()
+        this.saveMarkers()
       }
 
     }
@@ -403,10 +540,15 @@ export class Planete {
   controlPointsGroup !: THREE.Group
   mesh!: THREE.Mesh
   div!: HTMLDivElement
-  private tool!: SphereMarkerTool
+  tool!: SphereMarkerTool
   createDiv(): HTMLDivElement {
     this.div = document.createElement("div")
     return this.div
+  }
+  setSelectedMarkerColor(c: THREE.Color) {
+    this.tool.setSelectedMarkerColor(c)
+    this.saveMarkers()
+
   }
   initThree() {
 
@@ -466,13 +608,13 @@ export class Planete {
     console.log(centerLocal)
 
 
-
+    this.geometry.toNonIndexed();
 
 
     const matMetal: THREE.MeshStandardMaterialParameters = {
       roughness: 0.35,
       metalness: 0.4,
-      color: new THREE.Color('#ff7f50'), // corail
+      color: this.couleurCourante, // corail
     };
 
     // Matériaux (wireframe dispo si besoin)
@@ -482,6 +624,19 @@ export class Planete {
     });
 
     // Mesh
+    matMetal.vertexColors = true;
+    matMetal.color = new THREE.Color("#FFFFFF");
+    let color = this.geometry.getAttribute("color") as THREE.BufferAttribute;
+    const pos = this.geometry.getAttribute("position") as THREE.BufferAttribute;
+    if (!color || color.itemSize !== 3) {
+      const colors = new Float32Array(pos.count * 3);
+      color = new THREE.BufferAttribute(colors, 3);
+      this.geometry.setAttribute("color", color);
+      for (let i = 0; i < pos.count; i++) {
+        color.setXYZ(i, 0, 0.5, 0)
+
+      }
+    }
     this.mesh = new THREE.Mesh(this.geometry, new THREE.MeshStandardMaterial(matMetal));
     this.tool = new SphereMarkerTool(this, renderer, camera, this.scene, this.mesh, r)
 
@@ -504,6 +659,7 @@ export class Planete {
     renderer.domElement.style.width = '100%';
     renderer.domElement.style.height = '100%';
     this.div.appendChild(renderer.domElement);
+    this.loadMarkers()
 
     animate();
 
@@ -520,9 +676,16 @@ export class Planete {
     this.tf = this.types[this.sel[0]]
 
 
-this.tranformSphere()
+    this.tranformSphere()
 
 
+  }
+  navigationLabel: string = "Navigation"
+  createPlaneteNavigation(): PlaneteNavigation {
+    const r = new PlaneteNavigation()
+    r.colorFeature = this.tool.getAllColorFeatures()
+    r.pointFeatures = this.tool.getAllPointFeatures()
+    return r;
   }
 
 }
@@ -541,18 +704,20 @@ defineVue(Planete, (vue) => {
     height: "90vh",
 
   }, () => {
-    vue.flow({ orientation: "row" ,gap:'1vw'}, () => {
+    vue.flow({ orientation: "row", gap: '1vw' }, () => {
       vue.select({
         list: "types",
         displayMethod: "display",
         selection: "sel",
         update: "setTypeFonction",
         mode: "dropdown",
-        width: "25%"
+        width: "20%"
       })
-      vue.staticButton({ action: "eloignerDuCentre", label: "Eloigner", width: "25%", enable: "markerSelectionne" })
-      vue.staticButton({ action: "raprocherDuCentre", label: "Raprocher", width: "25%", enable: "markerSelectionne" })
-      vue.staticButton({ action: "supprimer", label: "Supprimer", width: "25%", enable: "markerSelectionne" })
+      vue.staticButton({ action: "eloignerDuCentre", label: "Eloigner", width: "16%", enable: "markerSelectionne" })
+      vue.staticButton({ action: "raprocherDuCentre", label: "Raprocher", width: "16%", enable: "markerSelectionne" })
+      vue.staticButton({ action: "supprimer", label: "Supprimer", width: "16%", enable: "markerSelectionne" })
+      vue.menu({ label: "Couleur", id: "choixCouleur", action: "choisirCouleur", name: "choixCouleur", buttonWidth: "16%" })
+      vue.bootVue({ label: "navigationLabel", factory: "createPlaneteNavigation", width: "16%" })
     })
 
     vue.custom({

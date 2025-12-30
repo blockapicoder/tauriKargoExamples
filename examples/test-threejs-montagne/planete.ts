@@ -1,5 +1,6 @@
 import { Vector2 } from "three";
 import { defineVue } from "./node_modules/tauri-kargo-tools/src/vue";
+
 import { creerFunction, distance, PointFeature, TypeFonction } from "./spi";
 
 
@@ -26,6 +27,7 @@ export class PlacerPointsPourPlanete {
     label = "hellp"
     cssW = 0
     cssH = 0
+  
 
 
     constructor() {
