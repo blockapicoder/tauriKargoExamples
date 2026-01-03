@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { updateFormulaPanel } from './formule';
 import { creerFunction, distance, PointFeature, TypeFonction } from './spi';
 import { defineVue } from './node_modules/tauri-kargo-tools/src/vue';
-import { PlaneteEditeur } from './app';
+import { PagePrincpal, PlaneteEditeur } from './app';
 import { ChoixCouleur } from './menu-couleur';
 import { createClient, TauriKargoClient } from "./node_modules/tauri-kargo-tools/src/api";
 
@@ -108,6 +108,7 @@ interface MarkerData {
 
 
 export class PlaneteNavigation {
+    titrePagePrincipal = "Page principal"
     pointFeatures: PointFeature<THREE.Vector3>[] = [];
     colorFeature: ColorFeature = { b: [], g: [], r: [] }
     base!: DeformBase
@@ -117,14 +118,16 @@ export class PlaneteNavigation {
     types: TypeFonction[] = ["DP", "SIN", "RDP"];
     choixCouleur!: ChoixCouleur
     couleurCourante = new THREE.Color("#FF0000")
+    _pagePrincipal!: PagePrincpal
 
     display(t: TypeFonction): string {
         return t
     }
     markerSelectionne = false
     F!: (p: THREE.Vector3) => number
-
-
+    pagePrincipal() {
+        return this._pagePrincipal
+    }
 
 
     tranformSphere() {
@@ -139,8 +142,8 @@ export class PlaneteNavigation {
 
             return a.distanceToSquared(b)
         }
-        const tmpF= creerFunction(this.tf, feature, distance)
-        this.F = (p:THREE.Vector3)=> { return this.facto*tmpF(p)+this.rayon}
+        const tmpF = creerFunction(this.tf, feature, distance)
+        this.F = (p: THREE.Vector3) => { return this.facto * tmpF(p) + this.rayon }
         for (const f of feature) {
             console.log(f.value, this.F(f.value), f.y)
         }
@@ -163,7 +166,7 @@ export class PlaneteNavigation {
     cameraController!: SphericalTerrainController
     client: TauriKargoClient = createClient()
     rayon = 10
-    facto =4
+    facto = 15
 
 
     createDiv(): HTMLDivElement {
@@ -180,7 +183,7 @@ export class PlaneteNavigation {
         this.scene.add(ambient);
 
         const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
-        dirLight.position.set(5, 6, 4);
+        dirLight.position.set(0, 0, 0);
         dirLight.castShadow = true;
         dirLight.shadow.mapSize.set(1024, 1024);
         dirLight.shadow.camera.near = 0.5;
@@ -189,9 +192,11 @@ export class PlaneteNavigation {
         this.scene.add(dirLight);
 
         // Point light colorée animée
-        const pointLight = new THREE.PointLight(0x66ccff, 1.0, 20, 2);
-        pointLight.position.set(-2, 2, -2);
-        this.scene.add(pointLight);
+        // Remplace le PointLight par un SpotLight "headlamp"
+        const headLight = new THREE.SpotLight(0xffffff, 80, 0, Math.PI / 2, 0.4, 1);
+        headLight.castShadow = false;
+        this.scene.add(headLight);
+        this.scene.add(headLight.target);
 
         // Caméra
         const camera = new THREE.PerspectiveCamera(
@@ -212,8 +217,8 @@ export class PlaneteNavigation {
 
         this.scene.add(meshAndControlPointsGroup);
         const r = 1;
-        const w = 80;
-        const h = 50;
+        const w = 150;
+        const h = 100;
 
         this.geometry = new THREE.SphereGeometry(r, w, h);
         this.geometry.computeBoundingSphere();
@@ -268,14 +273,14 @@ export class PlaneteNavigation {
 
         // heightFn qui accepte un dir en MONDE mais appelle F en LOCAL
 
-        const rayon = 10
+
         const heightWorld: HeightFn = (worldDir) => {
-         const localDir = worldDir.clone().applyQuaternion(qInv).normalize();
-           return this.F(localDir);
-          
+            const localDir = worldDir.clone().applyQuaternion(qInv).normalize();
+            return this.F(localDir);
+
         };
-        this.cameraController = new SphericalTerrainController(camera, renderer.domElement, 1, heightWorld, 0.25,   // eyeHeight (à ajuster)
-            0.8,    // speed (à ajuster)
+        this.cameraController = new SphericalTerrainController(camera, renderer.domElement, 1, heightWorld, 0.5,   // eyeHeight (à ajuster)
+            4,    // speed (à ajuster)
             0.002)
         let p = new THREE.Vector3(0, 1, 0)
         //const offset = heightWorld(p)
@@ -288,11 +293,27 @@ export class PlaneteNavigation {
             const t = clock.elapsedTime;
             requestAnimationFrame(animate);
 
-            pointLight.position.x = Math.cos(t * 0.8) * 2.2;
-            pointLight.position.z = Math.sin(t * 0.8) * 2.2;
-            pointLight.position.y = 1.8 + Math.sin(t * 1.6) * 0.3;
-    
             this.cameraController.update(dt);
+
+            // au-dessus de la tête + vers l’avant
+            const headOffset = 1.2;   // ajuste
+            const forwardOffset = 0;
+
+            const fwd = new THREE.Vector3();
+            camera.getWorldDirection(fwd);
+
+            headLight.position
+                .copy(camera.position)
+                .addScaledVector(this.cameraController.up, headOffset)
+                .addScaledVector(fwd, forwardOffset);
+
+            // viser devant (sinon le spot ne sert à rien)
+            headLight.target.position
+                .copy(camera.position)
+                .addScaledVector(fwd, forwardOffset);
+
+            headLight.target.updateMatrixWorld();
+
             // controls.update(); // nécessaire pour enableDamping
             renderer.render(this.scene, camera);
         };
@@ -364,23 +385,13 @@ export class PlaneteNavigation {
 defineVue(PlaneteNavigation, (vue) => {
     vue.flow({
         orientation: "column",
-        width: "50vw",
+        width: "100vw",
         gap: 5,
 
         height: "90vh",
 
     }, () => {
-        vue.flow({ orientation: "row", gap: '1vw' }, () => {
-            vue.select({
-                list: "types",
-                displayMethod: "display",
-                selection: "sel",
-                update: "setTypeFonction",
-                mode: "dropdown",
-                width: "20%"
-            })
-        })
-
+        vue.bootVue({ factory:"pagePrincipal" , label:"titrePagePrincipal"})
         vue.custom({
             factory: "createDiv",
             init: "initThree",
@@ -392,178 +403,200 @@ defineVue(PlaneteNavigation, (vue) => {
 })
 
 
-
-
-
-export type HeightFn = (worldDirUnit: THREE.Vector3) => number;
+export type HeightFn = (worldUpUnit: THREE.Vector3) => number;
 
 /**
- * FPS-like controller constrained to a spherical terrain:
- * - ArrowUp/ArrowDown (and Z/S) move forward/backward along the local tangent plane
- * - ArrowLeft/ArrowRight (and Q/D) strafe left/right
- * - Mouse (pointer-lock) controls heading/pitch
- * - Camera is snapped to terrain radius: R + height(dir) + eyeHeight
+ * Repère local (orthonormal) attaché au point de contact sur la sphère :
+ * - up      : normale du plan tangent (radiale, du centre vers le sol)  (unitaire)
+ * - forward : direction d’avancement dans le plan tangent              (unitaire)
+ * - right   : axe latéral dans le plan tangent                         (unitaire)
  *
- * Key fix vs pole singularities:
- * - Maintains a persistent tangent "northRef" and parallel-transports it when moving,
- *   preventing sudden basis flips near poles.
+ * Déplacements par rotations (pas d’addition de vecteurs sur la sphère) :
+ * - avancer/reculer : rotation du repère autour de right
+ * - pas de côté     : rotation du repère autour de forward
+ * - tourner G/D     : rotation du repère autour de up (yaw)
+ *
+ * La caméra est “fixe” dans ce repère :
+ * - position = up * (rayonSol + eyeHeight)
+ * - orientation = forward, avec un pitch autour de right (optionnel)
  */
 export class SphericalTerrainController {
-  private keys = new Set<string>();
+    private readonly keys = new Set<string>();
 
-  private heading = 0; // yaw around local up
-  private pitch = 0;   // pitch around local right
-  private readonly pitchLimit = Math.PI * 0.49;
+    // Repère
+    readonly up = new THREE.Vector3(0, 1, 0);
+    private readonly forward = new THREE.Vector3(0, 0, 1); // tangent
+    private readonly right = new THREE.Vector3(1, 0, 0);   // tangent
 
-  private dir = new THREE.Vector3(0, 1, 0);     // world-unit direction from center to ground point
-  private northRef = new THREE.Vector3(0, 0, 1); // persistent tangent reference
-  private tmp = new THREE.Vector3();
+    // Camera look (dans le repère)
+    private pitch = 0;
+    private readonly pitchLimit = Math.PI * 0.49;
 
-  constructor(
-    private camera: THREE.PerspectiveCamera,
-    private dom: HTMLElement,                   // use renderer.domElement
-    private readonly baseRadius: number,        // sphere radius at height 0
-    private readonly heightFn: HeightFn,        // height(worldDirUnit) -> number
-    private readonly eyeHeight = 0.05,          // small if baseRadius=1
-    private readonly moveSpeed = 0.8,           // units/second on the surface
-    private readonly mouseSensitivity = 0.002   // rad/pixel
-  ) {}
+    // Scratch (zéro allocation en update)
+    private readonly q = new THREE.Quaternion();
+    private readonly vTmp = new THREE.Vector3();
+    private readonly vTmp2 = new THREE.Vector3();
 
-  /** Set initial camera position (world). */
-  setPosition(worldPos: THREE.Vector3) {
-    this.dir.copy(worldPos).normalize();
+    private readonly onClick = () => this.dom.requestPointerLock();
 
-    // Ensure northRef is tangent to dir (avoid degeneracy)
-    this.northRef.projectOnPlane(this.dir);
-    if (this.northRef.lengthSq() < 1e-10) {
-      this.northRef.set(1, 0, 0).projectOnPlane(this.dir);
-    }
-    this.northRef.normalize();
+    constructor(
+        private readonly camera: THREE.PerspectiveCamera,
+        private readonly dom: HTMLElement,
+        private readonly baseRadius: number,
+        private readonly heightFn: HeightFn,
+        private readonly eyeHeight = 0.05,
+        private readonly moveSpeed = 0.8,          // unités/sec sur la surface
+        private readonly mouseSensitivity = 0.002  // rad/pixel
+    ) { }
 
-    this.snapToGround();
-  }
+    /** Initialise à partir d’une position monde. La direction initiale est déduite de la caméra. */
+    setPosition(worldPos: THREE.Vector3) {
+        this.up.copy(worldPos).normalize();
 
-  connect() {
-    // Capture phase helps when UI elements (select, inputs) eat arrows
-    document.addEventListener("keydown", this.onKeyDown, { capture: true });
-    document.addEventListener("keyup", this.onKeyUp, { capture: true });
+        // forward = direction caméra projetée sur le plan tangent
+        this.camera.getWorldDirection(this.vTmp); // déjà normalisé
+        this.vTmp.projectOnPlane(this.up);
 
-    // Pointer lock for mouse look
-    this.dom.addEventListener("click", () => this.dom.requestPointerLock());
-    document.addEventListener("mousemove", this.onMouseMove);
-  }
+        if (this.vTmp.lengthSq() < 1e-12) {
+            // fallback si caméra alignée avec up
+            this.vTmp.set(0, 0, 1).projectOnPlane(this.up);
+            if (this.vTmp.lengthSq() < 1e-12) this.vTmp.set(1, 0, 0).projectOnPlane(this.up);
+        }
 
-  disconnect() {
-    document.removeEventListener("keydown", this.onKeyDown, { capture: true } as any);
-    document.removeEventListener("keyup", this.onKeyUp, { capture: true } as any);
-    document.removeEventListener("mousemove", this.onMouseMove);
-  }
+        this.forward.copy(this.vTmp).normalize();
 
-  update(dt: number) {
-    if (!isFinite(dt) || dt <= 0) dt = 0;
+        // right = up × forward (repère main droite), puis forward re-orthonormalisé
+        this.right.copy(this.up).cross(this.forward).normalize();
+        this.forward.copy(this.right).cross(this.up).normalize();
 
-    const oldUp = this.dir.clone();
-    const up = this.dir; // local normal (world)
-
-    // Build a continuous tangent basis from northRef
-    const north = this.tmp.copy(this.northRef).projectOnPlane(up);
-    if (north.lengthSq() < 1e-10) {
-      // If somehow degenerate, pick a fallback and re-project
-      north.set(1, 0, 0).projectOnPlane(up);
-    }
-    north.normalize();
-
-    const east = new THREE.Vector3().copy(up).cross(north).normalize();
-    // Re-orthonormalize north to be safe
-    north.copy(east).cross(up).normalize();
-
-    // Save back the cleaned, tangent north reference
-    this.northRef.copy(north);
-
-    // Heading rotation inside tangent plane
-    const cosH = Math.cos(this.heading);
-    const sinH = Math.sin(this.heading);
-
-    const forwardTangent = new THREE.Vector3()
-      .copy(north).multiplyScalar(cosH)
-      .addScaledVector(east, sinH)
-      .normalize();
-
-    const rightTangent = new THREE.Vector3()
-      .copy(east).multiplyScalar(cosH)
-      .addScaledVector(north, -sinH)
-      .normalize();
-
-    // Keyboard movement intent
-    let fwd = 0, strafe = 0;
-    if (this.keys.has("ArrowUp") || this.keys.has("KeyZ")) fwd += 1;
-    if (this.keys.has("ArrowDown") || this.keys.has("KeyS")) fwd -= 1;
-    if (this.keys.has("ArrowRight") || this.keys.has("KeyD")) strafe += 1;
-    if (this.keys.has("ArrowLeft") || this.keys.has("KeyQ")) strafe -= 1;
-
-    if (fwd !== 0 || strafe !== 0) {
-      const disp = new THREE.Vector3()
-        .addScaledVector(forwardTangent, fwd)
-        .addScaledVector(rightTangent, strafe);
-
-      // Constant speed even on diagonals
-      disp.normalize().multiplyScalar(this.moveSpeed * dt);
-
-      // Small-step update on the sphere: push direction by tangent displacement
-      this.dir.addScaledVector(disp, 1 / this.currentRadiusApprox()).normalize();
-
-      // Parallel transport of northRef from oldUp to new dir to avoid "self-rotation"
-      const qUp = new THREE.Quaternion().setFromUnitVectors(oldUp, this.dir);
-      this.northRef.applyQuaternion(qUp).projectOnPlane(this.dir).normalize();
-
-      // Snap camera to terrain
-      this.snapToGround();
+        this.snapToGround();
     }
 
-    // Camera orientation (pitch around local right axis)
-    const cosP = Math.cos(this.pitch);
-    const sinP = Math.sin(this.pitch);
+    connect() {
+        document.addEventListener("keydown", this.onKeyDown, { capture: true });
+        document.addEventListener("keyup", this.onKeyUp, { capture: true });
 
-    const forward = new THREE.Vector3()
-      .copy(forwardTangent).multiplyScalar(cosP)
-      .addScaledVector(up, sinP)
-      .normalize();
-
-    this.camera.up.copy(up);
-    this.camera.lookAt(this.camera.position.clone().add(forward));
-  }
-
-  // ---- internals ----
-
-  private snapToGround() {
-    const ground = this.baseRadius + this.heightFn(this.dir) + this.eyeHeight;
-    this.camera.position.copy(this.dir).multiplyScalar(ground);
-  }
-
-  private currentRadiusApprox() {
-    return this.baseRadius + this.heightFn(this.dir) + this.eyeHeight;
-  }
-
-  private onKeyDown = (e: KeyboardEvent) => {
-    this.keys.add(e.code);
-
-    // prevent scroll / UI capture for arrows
-    if (e.code.startsWith("Arrow")) {
-      e.preventDefault();
-      e.stopPropagation();
+        this.dom.addEventListener("click", this.onClick);
+        document.addEventListener("mousemove", this.onMouseMove);
     }
-  };
 
-  private onKeyUp = (e: KeyboardEvent) => {
-    this.keys.delete(e.code);
-  };
+    disconnect() {
+        document.removeEventListener("keydown", this.onKeyDown, { capture: true } as any);
+        document.removeEventListener("keyup", this.onKeyUp, { capture: true } as any);
 
-  private onMouseMove = (e: MouseEvent) => {
-    if (document.pointerLockElement !== this.dom) return;
+        this.dom.removeEventListener("click", this.onClick);
+        document.removeEventListener("mousemove", this.onMouseMove);
+    }
 
-    this.heading -= e.movementX * this.mouseSensitivity;
-    this.pitch   -= e.movementY * this.mouseSensitivity;
+    update(dt: number) {
+        if (!isFinite(dt) || dt <= 0) return;
 
-    this.pitch = Math.max(-this.pitchLimit, Math.min(this.pitchLimit, this.pitch));
-  };
+        // Inputs déplacement (ZQSD + flèches)
+        let fwd = 0, strafe = 0;
+        if (this.keys.has("ArrowUp") || this.keys.has("KeyW") || this.keys.has("KeyZ")) fwd += 1;
+        if (this.keys.has("ArrowDown") || this.keys.has("KeyS")) fwd -= 1;
+        if (this.keys.has("ArrowRight") || this.keys.has("KeyD")) strafe += 1;
+        if (this.keys.has("ArrowLeft") || this.keys.has("KeyA") || this.keys.has("KeyQ")) strafe -= 1;
+
+        if (fwd !== 0 || strafe !== 0) {
+            // vitesse constante même en diagonale : normaliser l’intention (fwd, strafe)
+            const len = Math.hypot(fwd, strafe);
+            const nf = fwd / len;
+            const ns = strafe / len;
+
+            // angle = arcLength / radius
+            const radius = this.currentSurfaceRadius();
+            const angle = (this.moveSpeed * dt) / Math.max(1e-9, radius);
+
+            // Appliquer les rotations dans le repère :
+            // - avancer/reculer : autour de right
+            // - pas de côté     : autour de forward
+            // Ordre: forward puis strafe (ou inverse) — à petit dt, l’écart est négligeable.
+            if (nf !== 0) this.rotateFrame(this.right, nf * angle);
+            if (ns !== 0) this.rotateFrame(this.forward, ns * angle);
+
+            // Re-snap hauteur après déplacement
+            this.snapToGround();
+        } else {
+            // Même sans bouger, la hauteur peut changer si heightFn dépend d'autre chose (rare), sinon optionnel.
+            this.snapToGround();
+        }
+
+        // Caméra "fixe dans le repère" : up = normale locale
+        this.camera.up.copy(this.up);
+
+        // lookDir = forward pitché autour de right
+        const lookDir = this.vTmp.copy(this.forward);
+        if (this.pitch !== 0) {
+            this.q.setFromAxisAngle(this.right, this.pitch);
+            lookDir.applyQuaternion(this.q).normalize();
+        }
+
+        this.camera.lookAt(this.vTmp2.copy(this.camera.position).add(lookDir));
+    }
+
+    // ---------------- internals ----------------
+
+    /** Rotation rigide du repère autour d’un axe (exprimé en monde). */
+    private rotateFrame(axis: THREE.Vector3, angle: number) {
+        if (angle === 0) return;
+
+        this.q.setFromAxisAngle(axis, angle);
+
+        // rotation du repère complet (caméra fixe dedans)
+        this.up.applyQuaternion(this.q);
+        this.forward.applyQuaternion(this.q);
+        this.right.applyQuaternion(this.q);
+
+        // Nettoyage numérique (orthonormalisation)
+        this.up.normalize();
+
+        // forward tangent à up
+        this.forward.projectOnPlane(this.up);
+        if (this.forward.lengthSq() < 1e-12) {
+            // fallback : reconstruire un forward tangent depuis right si possible
+            this.forward.copy(this.right).cross(this.up);
+        }
+        this.forward.normalize();
+
+        // right = up × forward, puis forward re-orthonormalisé
+        this.right.copy(this.up).cross(this.forward).normalize();
+        this.forward.copy(this.right).cross(this.up).normalize();
+    }
+
+    private snapToGround() {
+        const r = this.currentSurfaceRadius() + this.eyeHeight;
+        this.camera.position.copy(this.up).multiplyScalar(r);
+    }
+
+    /** Rayon "sol" (sans eyeHeight) pour convertir distance->angle sur la surface. */
+    private currentSurfaceRadius() {
+        return this.baseRadius + this.heightFn(this.up);
+    }
+
+    private onKeyDown = (e: KeyboardEvent) => {
+        this.keys.add(e.code);
+
+        if (e.code.startsWith("Arrow")) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    };
+
+    private onKeyUp = (e: KeyboardEvent) => {
+        this.keys.delete(e.code);
+    };
+
+    private onMouseMove = (e: MouseEvent) => {
+        if (document.pointerLockElement !== this.dom) return;
+
+        // Tourner gauche/droite : rotation du repère autour de up (yaw)
+        const yaw = -e.movementX * this.mouseSensitivity;
+        if (yaw !== 0) this.rotateFrame(this.up, yaw);
+
+        // Pitch caméra dans le repère (sans modifier le repère lui-même)
+        this.pitch += e.movementY * this.mouseSensitivity;
+        this.pitch = Math.max(-this.pitchLimit, Math.min(this.pitchLimit, this.pitch));
+
+    };
 }

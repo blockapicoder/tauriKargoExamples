@@ -680,13 +680,7 @@ export class Planete {
 
 
   }
-  navigationLabel: string = "Navigation"
-  createPlaneteNavigation(): PlaneteNavigation {
-    const r = new PlaneteNavigation()
-    r.colorFeature = this.tool.getAllColorFeatures()
-    r.pointFeatures = this.tool.getAllPointFeatures()
-    return r;
-  }
+
 
 }
 
@@ -713,11 +707,11 @@ defineVue(Planete, (vue) => {
         mode: "dropdown",
         width: "20%"
       })
-      vue.staticButton({ action: "eloignerDuCentre", label: "Eloigner", width: "16%", enable: "markerSelectionne" })
-      vue.staticButton({ action: "raprocherDuCentre", label: "Raprocher", width: "16%", enable: "markerSelectionne" })
-      vue.staticButton({ action: "supprimer", label: "Supprimer", width: "16%", enable: "markerSelectionne" })
-      vue.menu({ label: "Couleur", id: "choixCouleur", action: "choisirCouleur", name: "choixCouleur", buttonWidth: "16%" })
-      vue.bootVue({ label: "navigationLabel", factory: "createPlaneteNavigation", width: "16%" })
+      vue.staticButton({ action: "eloignerDuCentre", label: "Eloigner", width: "20%", enable: "markerSelectionne" })
+      vue.staticButton({ action: "raprocherDuCentre", label: "Raprocher", width: "20%", enable: "markerSelectionne" })
+      vue.staticButton({ action: "supprimer", label: "Supprimer", width: "20%", enable: "markerSelectionne" })
+      vue.menu({ label: "Couleur", id: "choixCouleur", action: "choisirCouleur", name: "choixCouleur", buttonWidth: "20%" })
+ 
     })
 
     vue.custom({

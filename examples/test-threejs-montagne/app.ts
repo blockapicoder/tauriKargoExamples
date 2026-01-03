@@ -2,6 +2,7 @@ import { boot, defineVue } from "./node_modules/tauri-kargo-tools/src/vue"
 import { PlacerPointsPourPlanete } from "./planete";
 import { Montagne } from "./three-montagne";
 import { Planete } from "./three-planete";
+import { PlaneteNavigation } from "./three-planete-navigation";
 
 // rayon visuel du point 2D
 
@@ -315,14 +316,21 @@ defineVue(PlaneteEditeur, {
 
     ]
 })
-class PagePrincpal {
+export class PagePrincpal {
     titreMontagneEditeur = "Montagne editeur"
     titrePlaneteEditeur = "Planete editeur"
+    titrePlaneteNavigation = "Planete navigation"
     montagneEditeur() {
         return new MontagneEditeur()
     }
     planeteEditeur() {
         return new PlaneteEditeur()
+    }
+    planeteNavigation() {
+        const r = new PlaneteNavigation()
+        r._pagePrincipal = this
+
+        return r
     }
 
 
@@ -332,8 +340,9 @@ defineVue(PagePrincpal, {
     kind: "flow",
     orientation: "row",
     children: [
-        { kind: "bootVue", factory: "montagneEditeur", label: "titreMontagneEditeur", width: "50%" },
-        { kind: "bootVue", factory: "planeteEditeur", label: "titrePlaneteEditeur", width: "50%" },
+        { kind: "bootVue", factory: "montagneEditeur", label: "titreMontagneEditeur", width: "33%" },
+        { kind: "bootVue", factory: "planeteEditeur", label: "titrePlaneteEditeur", width: "33%" },
+        { kind: "bootVue", factory: "planeteNavigation", label: "titrePlaneteNavigation", width: "33%" },
     ]
 })
 boot(new PagePrincpal())
