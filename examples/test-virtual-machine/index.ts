@@ -39,19 +39,30 @@ class Editor {
     }
     async run() {
         const PRIMS = {
-            print: (s: string) => {
-                this.sortie += s
+            cr:()=> {
+                this.sortie+="\n"
             },
-            clear: ()=> {
-                this.sortie =""
+            print: (s: any) => {
+                if (typeof s === "string") {
+                    this.sortie += s
+                } else {
+                    this.sortie += JSON.stringify(s)
+                }
             },
-            cur:( f:(...values:any[])=>any , ...args:any[]) => {
-                return (...newArgs:any[])=> {
-                    const tmp:any[]= [...args,...newArgs]
+            clear: () => {
+                this.sortie = ""
+            },
+            cur: (f: (...values: any[]) => any, ...args: any[]) => {
+                return (...newArgs: any[]) => {
+                    const tmp: any[] = [...args, ...newArgs]
                     return f(...tmp)
                 }
 
-            }
+            },
+            array: (...args: any[]) => args,
+            map: (lst: any[], f: (o: any) => any) => lst.map(f),
+            filter: (lst: any[], f: (o: any) => boolean) => lst.filter(f),
+            concat: (...args: any[][]) => args.flatMap((e) => e)
         }
         const prog = await parse(this.codemirror.getValue())
         const js = vm.generateProg(prog)
@@ -93,7 +104,7 @@ class Editor {
         });
 
         // Important en Shadow DOM : refresh après chargement CSS + layout
-        Promise.resolve(cssReady).then(() => requestAnimationFrame(() =>   this.codemirror.refresh()));
+        Promise.resolve(cssReady).then(() => requestAnimationFrame(() => this.codemirror.refresh()));
     }
 
     ensureCodemirrorCss(root: ShadowRoot) {
