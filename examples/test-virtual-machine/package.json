@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "peggy": "^5.0.6"
+    "peggy": "^5.0.6",
+    "tauri-kargo-tools": "^0.2.1"
   }
 }

@@ -214,7 +214,7 @@ class MonacoEditor {
         const basePath = this.explorateur.contexte!.path
         await this.explorateur.tauriKargoClient.setCurrentDirectory({ path: basePath })
 
-        const filePath = this.repertoire.substring(basePath.length+1)
+        const filePath = this.repertoire.substring(basePath.length + 1)
         this.source = await this.explorateur.tauriKargoClient.readFileText(filePath)
         const ctx = await buildLightContext(this.explorateur.contexte!.contexte, filePath)
 

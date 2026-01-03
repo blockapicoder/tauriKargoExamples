@@ -85,15 +85,6 @@
         };
       }
 
-      if (e.type === "ifThenElse") {
-        return {
-          type: "ifThenElse",
-          if: resolveExpr(e.if, locals),
-          then: resolveExpr(e.then, locals),
-          else: resolveExpr(e.else, locals),
-        };
-      }
-
       throw new Error("Unknown expr: " + JSON.stringify(e));
     }
 
@@ -196,9 +187,9 @@ SetGlobalStmt
 
 // --- Fun definition ---
 FunDef
-  = "fun" __ name:Ident _ "(" _ params:ParamList? _ ")" _ "{" _
+  = "fun" __ name:Ident _ "(" _ params:ParamList? _ ")"  _";"_ 
       code:Instr* ret:ReturnStmt
-    _ "}" _ ";"? _
+   _
     {
       return { kind:"fun", name, params: params ?? [], code, ret };
     }
@@ -224,11 +215,11 @@ SetGlobalInFunStmt
     { return { kind:"setGlobal", name, value }; }
 
 IfRetStmt
-  =   "if:" _ cond:Expr _ "ret:" _ value:Expr _ ";" _
+  =   "if" _ cond:Expr _ "ret" _ value:Expr _ ";" _
     { return { kind:"ifRet", if: cond, then: value }; }
 
 ReturnStmt
-  = "ret:" _ value:Expr _ ";" _
+  = "ret" _ value:Expr _ ";" _
     { return value; }
 
 
@@ -252,7 +243,7 @@ CallExpr
   = op:CallOp _ "(" _ args:ArgList? _ ")"
     { return { type:"call", op, args: args ?? [] }; }
 ICallExpr
-  = op:CallOp _ "(" _ args:ArgList? _ ")"
+  ="call" _ op:CallOp _ "(" _ args:ArgList? _ ")" _ ";" _
     { return { kind:"call", op, args: args ?? [] }; }
 CallOp
   = o:Operator { return o; }

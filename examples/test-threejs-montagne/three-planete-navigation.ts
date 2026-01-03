@@ -139,7 +139,8 @@ export class PlaneteNavigation {
 
             return a.distanceToSquared(b)
         }
-        this.F = creerFunction(this.tf, feature, distance)
+        const tmpF= creerFunction(this.tf, feature, distance)
+        this.F = (p:THREE.Vector3)=> { return this.facto*tmpF(p)+this.rayon}
         for (const f of feature) {
             console.log(f.value, this.F(f.value), f.y)
         }
@@ -161,6 +162,8 @@ export class PlaneteNavigation {
     div!: HTMLDivElement
     cameraController!: SphericalTerrainController
     client: TauriKargoClient = createClient()
+    rayon = 10
+    facto =4
 
 
     createDiv(): HTMLDivElement {
@@ -209,8 +212,8 @@ export class PlaneteNavigation {
 
         this.scene.add(meshAndControlPointsGroup);
         const r = 1;
-        const w = 64;
-        const h = 32;
+        const w = 80;
+        const h = 50;
 
         this.geometry = new THREE.SphereGeometry(r, w, h);
         this.geometry.computeBoundingSphere();
@@ -264,6 +267,8 @@ export class PlaneteNavigation {
         const qInv = qWorld.clone().invert();
 
         // heightFn qui accepte un dir en MONDE mais appelle F en LOCAL
+
+        const rayon = 10
         const heightWorld: HeightFn = (worldDir) => {
          const localDir = worldDir.clone().applyQuaternion(qInv).normalize();
            return this.F(localDir);

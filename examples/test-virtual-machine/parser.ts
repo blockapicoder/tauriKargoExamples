@@ -1,5 +1,5 @@
 import * as peggy from "peggy";
-import { Prog } from "./vm";
+import { Prog } from "./model";
 let parser: any = undefined
 
 

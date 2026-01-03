@@ -1,21 +1,32 @@
 <!doctype html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Peggy test (import map)</title>
 
-    <!-- Import map : alias "peggy" vers un bundle ESM -->
-    <script type="importmap">
+<head>
+  <meta charset="utf-8" />
+  <title>Peggy test (import map)</title>
+  <link rel="stylesheet" href="codemirror/lib/codemirror.css">
+  <script src="codemirror/lib/codemirror.js"></script>
+  <script src="codemirror/addon/mode/simple.js"></script>
+   <style>
+ 
+
+
+      
+    </style>
+  <!-- Import map : alias "peggy" vers un bundle ESM -->
+  <script type="importmap">
   {
       "imports": {
         "peggy": "./peggy.js"     }
     }
     </script>
 
-  </head>
-  <body>
-  
-  </body>
-  
-  <script src="index.ts" type="module"></script>
+</head>
+
+<body>
+
+</body>
+
+<script src="index.ts" type="module"></script>
+
 </html>
