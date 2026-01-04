@@ -4,10 +4,15 @@
 
   // ------------------------------------------------------------
   // Lowering: Expr imbriquées -> Expr "graphe" (Call.args = Atom[])
+  // + Hoisting des lambdas non-capturantes (expr + bloc) en fun globales
   // ------------------------------------------------------------
   function lowerProgram(namedProg) {
     let tempId = 0;
     const freshTemp = () => `$t${++tempId}`;
+
+    let lambdaId = 0;
+    const freshLambda = () => `$lambda${++lambdaId}`;
+    const hoistedFuns = [];
 
     function mkTempSet(ctx, name, value) {
       // Top-level: temporaires en setGlobal ; dans fun: temporaires en setLocal
@@ -20,13 +25,114 @@
       return e && (e.type === "literal" || e.type === "var");
     }
 
+    // ----------------------------------------------------------
+    // Collecte des variables utilisées (pour détecter la capture)
+    // ----------------------------------------------------------
+    function collectVarRefs(expr, out) {
+      if (!expr) return;
+
+      if (expr.type === "var") {
+        out.add(expr.name);
+        return;
+      }
+      if (expr.type === "literal") return;
+
+      if (expr.type === "call") {
+        // op peut être string (primitive) ou {type:"var", name}
+        if (expr.op && typeof expr.op === "object" && expr.op.type === "var") {
+          out.add(expr.op.name);
+        }
+        for (const a of (expr.args ?? [])) collectVarRefs(a, out);
+        return;
+      }
+
+      if (expr.type === "lambda" || expr.type === "lambdaBlock") {
+        // IMPORTANT: ne pas descendre dans les lambdas (traitées séparément)
+        return;
+      }
+
+      throw new Error("collectVarRefs: unknown expr " + JSON.stringify(expr));
+    }
+
+    function collectVarRefsInCallOp(op, out) {
+      if (!op) return;
+      if (typeof op === "string") return;
+      if (op.type === "var") out.add(op.name);
+      else throw new Error("collectVarRefsInCallOp: invalid op " + JSON.stringify(op));
+    }
+
+    function collectVarRefsInInstr(ins, out) {
+      if (ins.kind === "setLocal" || ins.kind === "setGlobal") {
+        collectVarRefs(ins.value, out);
+        return;
+      }
+      if (ins.kind === "ifRet") {
+        collectVarRefs(ins.if, out);
+        collectVarRefs(ins.then, out);
+        return;
+      }
+      if (ins.kind === "call") {
+        collectVarRefsInCallOp(ins.op, out);
+        for (const a of (ins.args ?? [])) collectVarRefs(a, out);
+        return;
+      }
+      throw new Error("collectVarRefsInInstr: unknown instruction " + JSON.stringify(ins));
+    }
+
+    // ----------------------------------------------------------
+    // Lowering
+    // ----------------------------------------------------------
     // lowerExpr(ctx, expr, wantAtom) -> { prelude: Instr[], expr: Expr }
     // - wantAtom=true  => renvoie var/literal ; crée un temp si expr est un call
     // - wantAtom=false => renvoie expr (var/lit/call) mais call.args seront des atomes
     function lowerExpr(ctx, expr, wantAtom) {
       if (!expr) throw new Error("lowerExpr: empty expr");
+
       if (expr.type === "literal" || expr.type === "var") {
         return { prelude: [], expr };
+      }
+
+      // Lambdas: expression ou bloc
+      if (expr.type === "lambda" || expr.type === "lambdaBlock") {
+        const params = expr.params ?? [];
+        const code = (expr.type === "lambdaBlock") ? (expr.code ?? []) : [];
+        const retExpr = (expr.type === "lambdaBlock") ? expr.ret : expr.body;
+
+        // Interdiction de capture: référence à un local externe non redéfini dans la lambda
+        const outerLocals = ctx.locals ? new Set(ctx.locals) : new Set();
+
+        // Locaux propres à la lambda (ombrage autorisé)
+        const lambdaLocals = new Set(params);
+        if (expr.type === "lambdaBlock") {
+          for (const ins of code) {
+            if (ins.kind === "setLocal") lambdaLocals.add(ins.name);
+          }
+        }
+
+        const used = new Set();
+        for (const ins of code) collectVarRefsInInstr(ins, used);
+        collectVarRefs(retExpr, used);
+
+        for (const name of used) {
+          if (outerLocals.has(name) && !lambdaLocals.has(name)) {
+            throw new Error(`Lambda capture interdite: '${name}' (utilise un local du scope externe).`);
+          }
+        }
+
+        // Hoisting en fun globale
+        const fname = freshLambda();
+        const funStmt = {
+          kind: "fun",
+          name: fname,
+          params,
+          code,
+          ret: retExpr
+        };
+
+        hoistedFuns.push(lowerFun(funStmt));
+
+        // La lambda devient une référence (var) vers la fun générée
+        return { prelude: [], expr: v(fname) };
       }
 
       if (expr.type === "call") {
@@ -53,7 +159,7 @@
         return { prelude, expr: v(t) };
       }
 
-      throw new Error("Unknown expr node (expected literal/var/call): " + JSON.stringify(expr));
+      throw new Error("Unknown expr node (expected literal/var/call/lambda/lambdaBlock): " + JSON.stringify(expr));
     }
 
     function lowerCallStmt(ctx, st) {
@@ -81,10 +187,7 @@
       }
 
       if (ins.kind === "ifRet") {
-        // NOTE: on "hoiste" les temporaires de then avant le test.
-        // Cela suppose que les Expr sont pures (pas d'effets). Si tu veux préserver
-        // strictement l'évaluation conditionnelle pour des Expr à effets, il faut
-        // une transformation plus lourde (helper fun/thunk).
+        // NOTE: hoisting des temporaires de then avant le test (Expr supposées pures)
         const rc = lowerExpr(ctx, ins.if, false);
         const rt = lowerExpr(ctx, ins.then, false);
         return [
@@ -102,13 +205,21 @@
     }
 
     function lowerFun(st) {
-      const ctx = { scope: "local" };
+      // noms locaux visibles dans ce scope (params + setLocal)
+      const localNames = new Set(st.params);
+      for (const ins of st.code) {
+        if (ins.kind === "setLocal") localNames.add(ins.name);
+      }
+
+      const ctx = { scope: "local", locals: localNames };
+
       let code = [];
       for (const ins of st.code) {
         code.push(...lowerInstr(ctx, ins));
       }
       const rr = lowerExpr(ctx, st.ret, false);
       code.push(...rr.prelude);
+
       return {
         ...st,
         code,
@@ -123,27 +234,29 @@
         continue;
       }
       if (st.kind === "setGlobal") {
-        const ctx = { scope: "global" };
+        const ctx = { scope: "global", locals: null };
         const r = lowerExpr(ctx, st.value, false);
         out.push(...r.prelude);
         out.push({ ...st, value: r.expr });
         continue;
       }
       if (st.kind === "call") {
-        const ctx = { scope: "global" };
+        const ctx = { scope: "global", locals: null };
         out.push(...lowerCallStmt(ctx, st));
         continue;
       }
       throw new Error("Unknown statement kind: " + JSON.stringify(st));
     }
-    return out;
+
+    // Les lambdas hoistées (fun $lambdaN) doivent apparaître avant usage
+    return [...hoistedFuns, ...out];
   }
 
   // ------------------------------------------------------------
   // Name resolution (inchangé, mais appliqué après lowering)
   // ------------------------------------------------------------
   function resolveProgram(namedProg0) {
-    // 1) on "lower" d'abord pour obtenir un graphe (Call.args = Atom[])
+    // 1) lower d'abord => graphe (Call.args = Atom[])
     const namedProg = lowerProgram(namedProg0);
 
     const globalDeclared = new Set();
@@ -203,6 +316,10 @@
           op: resolveOp(e.op, locals),
           args: e.args.map(a => resolveAtom(a, locals)),
         };
+      }
+
+      if (e.type === "lambda" || e.type === "lambdaBlock") {
+        throw new Error("Lambda inattendue après lowering (elle aurait dû être hoistée).");
       }
 
       throw new Error("Unknown expr: " + JSON.stringify(e));
@@ -307,7 +424,7 @@ SetGlobalStmt
   = "setGlobal" __ name:Ident _ "=" _ value:Expr _ ";" _
     { return { kind:"setGlobal", name, value }; }
 
-// Fun syntax conservée telle que dans ton fichier (signature terminée par ';')
+// Fun syntax conservée (signature terminée par ';')
 FunDef
   = "fun" __ name:Ident _ "(" _ params:ParamList? _ ")" _ ";" _
       code:Instr* ret:ReturnStmt _
@@ -333,7 +450,7 @@ SetGlobalInFunStmt
   = "setGlobal" __ name:Ident _ "=" _ value:Expr _ ";" _
     { return { kind:"setGlobal", name, value }; }
 
-// ifRet: on garde tes mots-clés ("if ... ret ...;")
+// ifRet: "if ... ret ...;"
 IfRetStmt
   = "if" _ cond:Expr _ "ret" _ value:Expr _ ";" _
     { return { kind:"ifRet", if: cond, then: value }; }
@@ -390,8 +507,24 @@ UnaryExpr
 
 PrimaryExpr
   = "(" _ e:Expr _ ")" { return e; }
+  / LambdaExpr
   / CallNested
   / Atom
+
+
+// Lambdas non-capturantes:
+// - lambda(params) => Expr
+// - lambda(params) { Instr* ret Expr; }
+
+LambdaExpr
+  = "$" _ "(" _ params:ParamList? _ ")" _ tail:(
+        "=>" _ body:Expr
+          { return { type:"lambda", params: params ?? [], body }; }
+
+      / "{" _ code:Instr* ret:ReturnStmt _ "}"
+          { return { type:"lambdaBlock", params: params ?? [], code, ret }; }
+    )
+    { return tail; }
 
 // Appels imbriqués: op(expr, expr, ...)
 CallNested

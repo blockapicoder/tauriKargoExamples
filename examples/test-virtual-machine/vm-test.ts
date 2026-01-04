@@ -2,7 +2,7 @@
 import * as vm from "./model"
 import { parse } from "./parser"
 import * as cm from "./codemirror-module"
-const machine = new vm.Machine();
+
 function print(src: any) {
     if (typeof src === "string") {
         const pre = document.createElement("pre")
@@ -17,8 +17,7 @@ function print(src: any) {
 
 (async () => {
     let prog: vm.Prog = await parse("setGlobal A=10;")
-    machine.run(prog)
-    print(machine.globals[0]);
+
     prog = await parse(`setGlobal A = 40;
 setGlobal B = 2;
 
@@ -28,8 +27,7 @@ fun f(x, y) ;
 
 setGlobal R = f(A,B);
 `)
-    machine.run(prog)
-    print(machine.globals[3]);
+
     prog = await parse(`
     call clear();
   fun fact(n); 
@@ -50,8 +48,7 @@ ret x*y;
 call cr();
 call print(map(l,cur(f,2)));
 `)
-    machine.run(prog)
-    print(machine.globals[1]);
+
     const PRIMS = {
         print: print
     }
