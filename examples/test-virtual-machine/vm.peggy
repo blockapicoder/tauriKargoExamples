@@ -1,27 +1,152 @@
 {
-  /*
-    AST "nommé" (intermédiaire)
-      VarRef:   { type:"var", name }
-      Literal:  { type:"literal", value }
-      Call:     { type:"call", op: string | VarRef, args: Atom[] }
-      If:       { type:"ifThenElse", if: Expr, then: Expr, else: Expr }
-
-    Résolution finale (cible VM)
-      Global: { type:"global", idx }
-      Local:  { type:"local", idx }
-      Call.op: Var | string
-      Call.args: (Var | Literal)[]
-  */
-
   function v(name) { return { type: "var", name }; }
   function lit(value) { return { type: "literal", value }; }
 
-  // ---- Name resolution ----
-  function resolveProgram(namedProg) {
-    // globals "définis" (setGlobal / fun / setGlobal dans fun) => sert au choix op var vs string
-    const globalDeclared = new Set();
+  // ------------------------------------------------------------
+  // Lowering: Expr imbriquées -> Expr "graphe" (Call.args = Atom[])
+  // ------------------------------------------------------------
+  function lowerProgram(namedProg) {
+    let tempId = 0;
+    const freshTemp = () => `$t${++tempId}`;
 
-    // indices globaux effectifs (inclut aussi les globals référencés)
+    function mkTempSet(ctx, name, value) {
+      // Top-level: temporaires en setGlobal ; dans fun: temporaires en setLocal
+      return (ctx.scope === "global")
+        ? { kind: "setGlobal", name, value }
+        : { kind: "setLocal", name, value };
+    }
+
+    function isAtom(e) {
+      return e && (e.type === "literal" || e.type === "var");
+    }
+
+    // lowerExpr(ctx, expr, wantAtom) -> { prelude: Instr[], expr: Expr }
+    // - wantAtom=true  => renvoie var/literal ; crée un temp si expr est un call
+    // - wantAtom=false => renvoie expr (var/lit/call) mais call.args seront des atomes
+    function lowerExpr(ctx, expr, wantAtom) {
+      if (!expr) throw new Error("lowerExpr: empty expr");
+      if (expr.type === "literal" || expr.type === "var") {
+        return { prelude: [], expr };
+      }
+
+      if (expr.type === "call") {
+        // args peuvent être des Expr imbriquées (au parse) => on force des atomes
+        const prelude = [];
+        const atoms = [];
+
+        for (const a of (expr.args ?? [])) {
+          const r = lowerExpr(ctx, a, true); // args doivent devenir des atomes
+          prelude.push(...r.prelude);
+          if (!isAtom(r.expr)) throw new Error("Expected atom after lowering arg");
+          atoms.push(r.expr);
+        }
+
+        const callFlat = { type: "call", op: expr.op, args: atoms };
+
+        if (!wantAtom) {
+          return { prelude, expr: callFlat };
+        }
+
+        // besoin d'un atome => temp
+        const t = freshTemp();
+        prelude.push(mkTempSet(ctx, t, callFlat));
+        return { prelude, expr: v(t) };
+      }
+
+      throw new Error("Unknown expr node (expected literal/var/call): " + JSON.stringify(expr));
+    }
+
+    function lowerCallStmt(ctx, st) {
+      // st.kind === "call" avec args: Expr[] (imbriquées possibles)
+      const prelude = [];
+      const atoms = [];
+      for (const a of (st.args ?? [])) {
+        const r = lowerExpr(ctx, a, true);
+        prelude.push(...r.prelude);
+        atoms.push(r.expr);
+      }
+      return [
+        ...prelude,
+        { kind: "call", op: st.op, args: atoms }
+      ];
+    }
+
+    function lowerInstr(ctx, ins) {
+      if (ins.kind === "setLocal" || ins.kind === "setGlobal") {
+        const r = lowerExpr(ctx, ins.value, false);
+        return [
+          ...r.prelude,
+          { ...ins, value: r.expr }
+        ];
+      }
+
+      if (ins.kind === "ifRet") {
+        // NOTE: on "hoiste" les temporaires de then avant le test.
+        // Cela suppose que les Expr sont pures (pas d'effets). Si tu veux préserver
+        // strictement l'évaluation conditionnelle pour des Expr à effets, il faut
+        // une transformation plus lourde (helper fun/thunk).
+        const rc = lowerExpr(ctx, ins.if, false);
+        const rt = lowerExpr(ctx, ins.then, false);
+        return [
+          ...rc.prelude,
+          ...rt.prelude,
+          { kind: "ifRet", if: rc.expr, then: rt.expr }
+        ];
+      }
+
+      if (ins.kind === "call") {
+        return lowerCallStmt(ctx, ins);
+      }
+
+      throw new Error("Unknown instruction kind: " + JSON.stringify(ins));
+    }
+
+    function lowerFun(st) {
+      const ctx = { scope: "local" };
+      let code = [];
+      for (const ins of st.code) {
+        code.push(...lowerInstr(ctx, ins));
+      }
+      const rr = lowerExpr(ctx, st.ret, false);
+      code.push(...rr.prelude);
+      return {
+        ...st,
+        code,
+        ret: rr.expr
+      };
+    }
+
+    const out = [];
+    for (const st of namedProg) {
+      if (st.kind === "fun") {
+        out.push(lowerFun(st));
+        continue;
+      }
+      if (st.kind === "setGlobal") {
+        const ctx = { scope: "global" };
+        const r = lowerExpr(ctx, st.value, false);
+        out.push(...r.prelude);
+        out.push({ ...st, value: r.expr });
+        continue;
+      }
+      if (st.kind === "call") {
+        const ctx = { scope: "global" };
+        out.push(...lowerCallStmt(ctx, st));
+        continue;
+      }
+      throw new Error("Unknown statement kind: " + JSON.stringify(st));
+    }
+    return out;
+  }
+
+  // ------------------------------------------------------------
+  // Name resolution (inchangé, mais appliqué après lowering)
+  // ------------------------------------------------------------
+  function resolveProgram(namedProg0) {
+    // 1) on "lower" d'abord pour obtenir un graphe (Call.args = Atom[])
+    const namedProg = lowerProgram(namedProg0);
+
+    const globalDeclared = new Set();
     const globalIndex = new Map();
     let nextG = 0;
 
@@ -34,7 +159,7 @@
       return globalIndex.get(name);
     }
 
-    // Pass 0: déclarer les globals "définis" dans l'ordre d'apparition
+    // Pass 0: globals "définis"
     for (const st of namedProg) {
       if (st.kind === "setGlobal") declareGlobal(st.name);
       if (st.kind === "fun") {
@@ -55,18 +180,13 @@
     }
 
     function resolveOp(op, locals) {
-      if (typeof op === "string") return op; // opérateur/primitive => string
+      if (typeof op === "string") return op;
       if (!op || op.type !== "var") throw new Error("Invalid op: " + JSON.stringify(op));
       const name = op.name;
 
-      // local défini => Var
       if (locals && locals.has(name)) return { type: "local", idx: locals.get(name) };
-
-      // global "défini" (setGlobal/fun) => Var
       if (globalDeclared.has(name)) return { type: "global", idx: ensureGlobal(name) };
-
-      // sinon: garder le nom (primitive) => string
-      return name;
+      return name; // non défini => string (primitive)
     }
 
     function resolveExpr(e, locals) {
@@ -88,7 +208,6 @@
       throw new Error("Unknown expr: " + JSON.stringify(e));
     }
 
-    // Pass 1: produire le Prog cible
     const out = [];
 
     for (const st of namedProg) {
@@ -100,17 +219,17 @@
         });
         continue;
       }
-if (st.kind === "call") {
-        out.push( {
+
+      if (st.kind === "call") {
+        out.push({
           type: "call",
           op: resolveOp(st.op, null),
           args: st.args.map(a => resolveAtom(a, null)),
         });
-          continue;
+        continue;
       }
 
       if (st.kind === "fun") {
-        // locals: params puis set(...) (setLocal) dans l'ordre
         const locals = new Map();
         let nextL = 0;
 
@@ -138,6 +257,13 @@ if (st.kind === "call") {
               type: "setGlobal",
               var: ensureGlobal(ins.name),
               value: resolveExpr(ins.value, locals),
+            };
+          }
+          if (ins.kind === "call") {
+            return {
+              type: "call",
+              op: resolveOp(ins.op, locals),
+              args: ins.args.map(a => resolveAtom(a, locals)),
             };
           }
           if (ins.kind === "ifRet") {
@@ -173,23 +299,18 @@ Program
   = s:Statement* { return s; }
 
 Statement
-  = 
-  ICallExpr
+  = ICallExpr
   / SetGlobalStmt
   / FunDef
-  
 
-
-// --- Top-level setGlobal ---
 SetGlobalStmt
   = "setGlobal" __ name:Ident _ "=" _ value:Expr _ ";" _
     { return { kind:"setGlobal", name, value }; }
 
-// --- Fun definition ---
+// Fun syntax conservée telle que dans ton fichier (signature terminée par ';')
 FunDef
-  = "fun" __ name:Ident _ "(" _ params:ParamList? _ ")"  _";"_ 
-      code:Instr* ret:ReturnStmt
-   _
+  = "fun" __ name:Ident _ "(" _ params:ParamList? _ ")" _ ";" _
+      code:Instr* ret:ReturnStmt _
     {
       return { kind:"fun", name, params: params ?? [], code, ret };
     }
@@ -198,13 +319,11 @@ ParamList
   = head:Ident tail:(_ "," _ Ident)*
     { return [head].concat(tail.map(x => x[3])); }
 
-// --- Instructions in fun ---
 Instr
   = SetLocalStmt
   / SetGlobalInFunStmt
   / IfRetStmt
   / ICallExpr
-
 
 SetLocalStmt
   = "set" __ name:Ident _ "=" _ value:Expr _ ";" _
@@ -214,44 +333,82 @@ SetGlobalInFunStmt
   = "setGlobal" __ name:Ident _ "=" _ value:Expr _ ";" _
     { return { kind:"setGlobal", name, value }; }
 
+// ifRet: on garde tes mots-clés ("if ... ret ...;")
 IfRetStmt
-  =   "if" _ cond:Expr _ "ret" _ value:Expr _ ";" _
+  = "if" _ cond:Expr _ "ret" _ value:Expr _ ";" _
     { return { kind:"ifRet", if: cond, then: value }; }
 
 ReturnStmt
   = "ret" _ value:Expr _ ";" _
     { return value; }
 
+// ------------------------------------------------------------
+// Expr recursive + parenthèses + précédence
+// ------------------------------------------------------------
+Expr = OrExpr
 
+OrExpr
+  = head:AndExpr tail:(_ "||" _ AndExpr)*
+    {
+      return tail.reduce((acc, t) => ({ type:"call", op:"||", args:[acc, t[3]] }), head);
+    }
 
+AndExpr
+  = head:EqExpr tail:(_ "&&" _ EqExpr)*
+    {
+      return tail.reduce((acc, t) => ({ type:"call", op:"&&", args:[acc, t[3]] }), head);
+    }
 
+EqExpr
+  = head:RelExpr tail:(_ op:("==" / "!=") _ RelExpr)*
+    {
+      return tail.reduce((acc, t) => ({ type:"call", op:t[1], args:[acc, t[3]] }), head);
+    }
 
-// Expr is NOT recursive by design (no E op E), only:
-// - Infix: Atom OP Atom
-// - Call:  op(Atom,...)
-// - Atom:  Var | Literal
-Expr
-  = InfixExpr
-  / CallExpr
+RelExpr
+  = head:AddExpr tail:(_ op:("<=" / ">=" / "<" / ">") _ AddExpr)*
+    {
+      return tail.reduce((acc, t) => ({ type:"call", op:t[1], args:[acc, t[3]] }), head);
+    }
+
+AddExpr
+  = head:MulExpr tail:(_ op:("+" / "-") _ MulExpr)*
+    {
+      return tail.reduce((acc, t) => ({ type:"call", op:t[1], args:[acc, t[3]] }), head);
+    }
+
+MulExpr
+  = head:UnaryExpr tail:(_ op:("*" / "/") _ UnaryExpr)*
+    {
+      return tail.reduce((acc, t) => ({ type:"call", op:t[1], args:[acc, t[3]] }), head);
+    }
+
+UnaryExpr
+  = "-" _ e:UnaryExpr { return { type:"call", op:"-", args:[lit(0), e] }; }
+  / "+" _ e:UnaryExpr { return e; }
+  / PrimaryExpr
+
+PrimaryExpr
+  = "(" _ e:Expr _ ")" { return e; }
+  / CallNested
   / Atom
 
-InfixExpr
-  = a:Atom _ op:Operator _ b:Atom
-    { return { type:"call", op, args:[a,b] }; }
-
-CallExpr
-  = op:CallOp _ "(" _ args:ArgList? _ ")"
+// Appels imbriqués: op(expr, expr, ...)
+CallNested
+  = op:CallOp _ "(" _ args:ExprList? _ ")"
     { return { type:"call", op, args: args ?? [] }; }
+
 ICallExpr
-  ="call" _ op:CallOp _ "(" _ args:ArgList? _ ")" _ ";" _
+  = "call" _ op:CallOp _ "(" _ args:ExprList? _ ")" _ ";" _
     { return { kind:"call", op, args: args ?? [] }; }
+
+ExprList
+  = head:Expr tail:(_ "," _ Expr)*
+    { return [head].concat(tail.map(x => x[3])); }
+
 CallOp
   = o:Operator { return o; }
   / id:Ident   { return { type:"var", name: id }; }
-
-ArgList
-  = head:Atom tail:(_ "," _ Atom)*
-    { return [head].concat(tail.map(x => x[3])); }
 
 Atom
   = Literal
@@ -286,7 +443,7 @@ StrChar
 
 // --- Tokens ---
 Ident
-  = $([A-Za-z_][A-Za-z0-9_]*)
+  = $([A-Za-z_$][A-Za-z0-9_$]*)
 
 Operator
   = $("==" / "!=" / "<=" / ">=" / "&&" / "||" / "+" / "-" / "*" / "/" / "<" / ">")

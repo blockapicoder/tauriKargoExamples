@@ -31,13 +31,24 @@ setGlobal R = f(A,B);
     machine.run(prog)
     print(machine.globals[3]);
     prog = await parse(`
+    call clear();
   fun fact(n); 
   if n==0 ret 1;
-  set m = n - 1;
-  set r = fact(m);
-  ret n * r;
+  ret n * fact(n-1);
   setGlobal R = fact(4);
   call print(R);
+
+setGlobal l=concat(array(1,2),array(-3,4));
+call print(l);
+fun p(x,y);
+if x >  y ret true;
+ret false;
+call cr();
+call print(filter(l,cur(p,2)));
+fun f(x,y);
+ret x*y;
+call cr();
+call print(map(l,cur(f,2)));
 `)
     machine.run(prog)
     print(machine.globals[1]);
