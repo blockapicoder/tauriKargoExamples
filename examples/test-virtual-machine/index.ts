@@ -65,6 +65,7 @@ class Editor {
             concat: (...args: any[][]) => args.flatMap((e) => e)
         }
         const prog = await parse(this.codemirror.getValue())
+        console.log(JSON.stringify(prog,null,2))
         const js = vm.generateProg(prog)
         const run = eval(js) as (prims: any) => any
 

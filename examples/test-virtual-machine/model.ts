@@ -2,20 +2,26 @@ export interface Global { type: 'global', idx: number }
 export interface Local { type: 'local', idx: number }
 export type Var = Local | Global
 export type Literal = { type: "literal", value: number | string | boolean }
-export interface Call<Var> {
+export interface Call<V> {
     type: "call",
-    op: Var | string
-    args: (Var | Literal)[]
+    op: V | string
+    args: (V | Literal)[]
 }
-export type Expr<Var> = Var | Call<Var> | Literal
+export interface PartialCall<V> {
+    type: 'partialCall'
+    op: V,
+    args: (V | Literal)[]
+}
+
+export type Expr<Var> = Var | Call<Var> | Literal | PartialCall<Var>
 
 export interface IfRet { type: 'ifRet', if: Expr<Var>, then: Expr<Var> }
 export interface Ret { type: 'ret', value: Expr<Var> }
-export interface Set { type: 'setLocal' | 'setGlobal', var: number, value: Expr<Var> }
-export interface SetGlobal { type: 'setGlobal', var: number, value: Expr<Global> }
+export interface SetVar { type: 'setLocal' | 'setGlobal', var: number, value: Expr<Var> }
+export interface SetVarGlobal { type: 'setGlobal', var: number, value: Expr<Global> }
 export interface Fun extends Code { var: number }
-export type Prog = (SetGlobal | Fun | Call<Global>)[]
-export interface Code { type: "fun", code: (Set | IfRet | Call<Var>)[], ret: Expr<Var> }
+export type Prog = (SetVarGlobal | Fun | Call<Global>)[]
+export interface Code { type: "fun", code: (SetVar | IfRet | Call<Var>)[], ret: Expr<Var> }
 
 
 
@@ -23,74 +29,120 @@ export interface Code { type: "fun", code: (Set | IfRet | Call<Var>)[], ret: Exp
 
 
 export type Cell = (Code | Literal)
-export function generateFun(fun: Fun) {
+// Adapte/importe tes types existants
+// type Fun, Var, Literal, Expr, Set, IfRet, Call, SetGlobal, Global, Prog, etc.
 
-    return `globals[${fun.var}] = function (...locals) {
-        ${fun.code.map((i)=> generateInstrFun(i)).join("\n")};\n
-        return ${generateExpr(fun.ret)}
-    }`
+export class Generator {
+    constructor(
+        public readonly opts?: {
+            // opérateurs infixes supportés (2-aires) : tu peux compléter
+            infixOps?: Set<string>;
+            partialCallPrimName?: string
+        },
+    ) { }
 
-
-
-}
-export function generateVar(v: Var | Literal) {
-    if (v.type === "global") {
-        return `globals[${v.idx}]`
-    }
-    if (v.type === "local") {
-        return `locals[${v.idx}]`
-    }
-    return JSON.stringify(v.value)
-
-}
-export function generateExpr(v: Expr<Var>) {
-    if (v.type === "call") {
-        return generateCall(v)
-    }
-    return generateVar(v)
-}
-export function generateInstrFun(i: Set | IfRet | Call<Var>) {
-    if (i.type === "call") {
-        return generateCall(i)
-    }
-    if (i.type === "setGlobal") {
-        return `globals[${i.var}]=${generateExpr(i.value)}`
-    }
-    if (i.type === "setLocal") {
-        return `locals[${i.var}]=${generateExpr(i.value)}`
-    }
-    if (i.type==="ifRet") {
-        return `if (${generateExpr(i.if)}) { return ${generateExpr(i.then)} }`
+    private infixOps(): Set<string> {
+        return (
+            this.opts?.infixOps ??
+            new Set(["+", "*", "-", "/", "==", "===", ">", "<", ">=", "<=", "!=", "&&", "||"])
+        );
     }
 
-}
-export function generateInstr(i: SetGlobal | Fun | Call<Global>) {
-    if (i.type === "call") {
-        return generateCall(i)
+    generateFun(fun: Fun): string {
+        return `globals[${fun.var}] = function (...locals) {
+${fun.code.map((i) => this.generateInstrFun(i)).join("\n")};
+return ${this.generateExpr(fun.ret)}
+}`;
     }
-    if (i.type === "setGlobal") {
-        return `globals[${i.var}]=${generateExpr(i.value)}`
-    }
-    if (i.type ==="fun") {
-        return generateFun(i)
-    }
-  
 
-}
-export function generateCall(i: Call<Var>) {
-    if (typeof i.op === "string") {
-        if (["+", "*", "-", "/", "==",">","===","<",">=","<=","!=","&&","!="].includes(i.op)) {
-            if (i.args.length === 2) {
-                return `${generateVar(i.args[0])}${i.op}${generateVar(i.args[1])}`
-            }
+    generateVar(v: Var | Literal): string {
+        if (v.type === "global") {
+            return `globals[${v.idx}]`;
         }
-        return `prims[${JSON.stringify(i.op)}](${i.args.map((e) => generateVar(e)).join(",")})`
+        if (v.type === "local") {
+            return `locals[${v.idx}]`;
+        }
+        return JSON.stringify(v.value);
     }
-    return `${generateVar(i.op)}(${i.args.map((e) => generateVar(e)).join(",")})`
 
+    generateExpr(v: Expr<Var>): string {
+        if (v.type === "call") {
+            return this.generateCall(v);
+        }
+        if (v.type === "partialCall") {
+            return this.generatePartialCall(v)
+
+        }
+        return this.generateVar(v as any);
+    }
+
+    generateInstrFun(i: SetVar | IfRet | Call<Var>): string {
+        if (i.type === "call") {
+            return this.generateCall(i);
+        }
+        if (i.type === "setGlobal") {
+            return `globals[${i.var}]=${this.generateExpr(i.value)}`;
+        }
+        if (i.type === "setLocal") {
+            return `locals[${i.var}]=${this.generateExpr(i.value)}`;
+        }
+        if (i.type === "ifRet") {
+            return `if (${this.generateExpr(i.if)}) { return ${this.generateExpr(i.then)} }`;
+        }
+        // sécurité (au cas où un nouveau type arrive)
+        throw new Error("Unknown fun instruction: " + JSON.stringify(i));
+    }
+
+    generateInstr(i: SetVarGlobal | Fun | Call<Global>): string {
+        if (i.type === "call") {
+            return this.generateCall(i as any);
+        }
+        if (i.type === "setGlobal") {
+            return `globals[${i.var}]=${this.generateExpr(i.value as any)}`;
+        }
+        if (i.type === "fun") {
+            return this.generateFun(i as any);
+        }
+        throw new Error("Unknown top-level instruction: " + JSON.stringify(i));
+    }
+
+    generateCall(i: Call<Var>): string {
+        if (typeof i.op === "string") {
+            // opérateur infixe 2-aire
+            if (this.infixOps().has(i.op) && i.args.length === 2) {
+                return `${this.generateVar(i.args[0] as any)}${i.op}${this.generateVar(i.args[1] as any)}`;
+            }
+
+            // primitive prims["op"](...)
+            return `prims[${JSON.stringify(i.op)}](${i.args.map((e) => this.generateVar(e as any)).join(",")})`;
+        }
+
+        // appel indirect: (globals[k] / locals[k])(...)
+        return `${this.generateVar(i.op as any)}(${i.args.map((e) => this.generateVar(e as any)).join(",")})`;
+    }
+    generatePartialCall(i: PartialCall<Var>): string {
+             let partialCallPrimName = this.opts?.partialCallPrimName
+     
+   
+        if (!partialCallPrimName) {
+            partialCallPrimName = "cur"
+        }
+
+        // appel indirect: (globals[k] / locals[k])(...)
+        return `prims[${JSON.stringify(partialCallPrimName)}](${this.generateVar(i.op as any)},${i.args.map((e) => this.generateVar(e as any)).join(",")})`;
+    }
+    generateProg(prog: Prog): string {
+        return `(prims) => {
+  let globals = [];
+${prog.map((i) => this.generateInstr(i as any)).join("\n")};
+  return globals;
+}`;
+    }
 }
+
 export function generateProg(prog: Prog) {
-    return ` ( prims ) => { let globals= []; \n ${prog.map( (i)=> generateInstr(i)).join("\n")}; \n return globals  }`
+    const gen = new Generator();
+    return gen.generateProg(prog)
 }
 
 

@@ -59,4 +59,9 @@ call print(map(l,cur(f,2)));
     print(run(PRIMS))
     print(!!cm.CodeMirror)
 
-})()
+})();
+
+`call clear();
+setGlobal lst=array(1,2);
+setGlobal list2 = array(5,10,15);
+call print(map(lst,$(x) =>map(list2,$(y)=>y*x)));`
