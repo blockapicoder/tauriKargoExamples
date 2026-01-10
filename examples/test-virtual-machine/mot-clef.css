@@ -20,3 +20,7 @@
     color: #22863a;
     font-weight: bold;
 }
+.CodeMirror  {
+ height: 80vh;
+}
+.editorWrap { height: 100%; width:100%}   /* ton conteneur */

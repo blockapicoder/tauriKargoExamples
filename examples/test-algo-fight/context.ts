@@ -1,7 +1,7 @@
 // ts-context-prune.ts
 
 import { createClient } from "./node_modules/tauri-kargo-tools/src/api";
-import { Content, TypescriptContext } from ".";
+import { Content, TypescriptContext } from "./editeur";
 
 const tauriKargoClient = createClient()
 

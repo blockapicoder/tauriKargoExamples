@@ -37,7 +37,7 @@ export class Generator {
         public readonly opts?: {
             // opérateurs infixes supportés (2-aires) : tu peux compléter
             infixOps?: Set<string>;
-            partialCallPrimName?: string
+          
         },
     ) { }
 
@@ -121,15 +121,9 @@ return ${this.generateExpr(fun.ret)}
         return `${this.generateVar(i.op as any)}(${i.args.map((e) => this.generateVar(e as any)).join(",")})`;
     }
     generatePartialCall(i: PartialCall<Var>): string {
-             let partialCallPrimName = this.opts?.partialCallPrimName
-     
-   
-        if (!partialCallPrimName) {
-            partialCallPrimName = "cur"
-        }
-
+       
         // appel indirect: (globals[k] / locals[k])(...)
-        return `prims[${JSON.stringify(partialCallPrimName)}](${this.generateVar(i.op as any)},${i.args.map((e) => this.generateVar(e as any)).join(",")})`;
+        return `(...args)=>${this.generateVar(i.op as any)}(...[${i.args.map((e) => this.generateVar(e as any)).join(",")}],...args)`;
     }
     generateProg(prog: Prog): string {
         return `(prims) => {

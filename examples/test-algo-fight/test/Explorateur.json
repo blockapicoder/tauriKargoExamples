@@ -1,0 +1,224 @@
+{
+    "title": "Explorateur",
+    "steps": [
+        {
+            "type": "setViewport",
+            "width": 1522,
+            "height": 746,
+            "deviceScaleFactor": 1,
+            "isMobile": false,
+            "hasTouch": false,
+            "isLandscape": false
+        },
+        {
+            "type": "click",
+            "target": "main",
+            "selectors": [
+                [
+                    "input"
+                ],
+                [
+                    "xpath//html/body/div/div/div[1]/input"
+                ],
+                [
+                    "pierce/input"
+                ]
+            ],
+            "offsetY": 27,
+            "offsetX": 64
+        },
+        {
+            "type": "click",
+            "target": "main",
+            "selectors": [
+                [
+                    "aria/Remonter"
+                ],
+                [
+                    "body > div > div > div:nth-of-type(1) > button"
+                ],
+                [
+                    "xpath//html/body/div/div/div[1]/button"
+                ],
+                [
+                    "pierce/body > div > div > div:nth-of-type(1) > button"
+                ],
+                [
+                    "text/Remonter"
+                ]
+            ],
+            "offsetY": 23.003169481176883,
+            "offsetX": 276.8125
+        },
+        {
+            "type": "click",
+            "target": "main",
+            "selectors": [
+                [
+                    "input"
+                ],
+                [
+                    "xpath//html/body/div/div/div[1]/input"
+                ],
+                [
+                    "pierce/input"
+                ]
+            ],
+            "offsetY": 14,
+            "offsetX": 143
+        },
+        {
+            "type": "change",
+            "value": "C:\\users\\",
+            "selectors": [
+                [
+                    "input"
+                ],
+                [
+                    "xpath//html/body/div/div/div[1]/input"
+                ],
+                [
+                    "pierce/input"
+                ]
+            ],
+            "target": "main"
+        },
+        {
+            "type": "keyUp",
+            "key": "_",
+            "target": "main"
+        },
+        {
+            "type": "change",
+            "value": "C:\\users\\david\\",
+            "selectors": [
+                [
+                    "input"
+                ],
+                [
+                    "xpath//html/body/div/div/div[1]/input"
+                ],
+                [
+                    "pierce/input"
+                ]
+            ],
+            "target": "main"
+        },
+        {
+            "type": "keyUp",
+            "key": "_",
+            "target": "main"
+        },
+        {
+            "type": "change",
+            "value": "C:\\users\\david\\documents\\",
+            "selectors": [
+                [
+                    "input"
+                ],
+                [
+                    "xpath//html/body/div/div/div[1]/input"
+                ],
+                [
+                    "pierce/input"
+                ]
+            ],
+            "target": "main"
+        },
+        {
+            "type": "keyUp",
+            "key": "_",
+            "target": "main"
+        },
+        {
+            "type": "change",
+            "value": "C:\\users\\david\\documents\\github",
+            "selectors": [
+                [
+                    "input"
+                ],
+                [
+                    "xpath//html/body/div/div/div[1]/input"
+                ],
+                [
+                    "pierce/input"
+                ]
+            ],
+            "target": "main"
+        },
+        {
+            "type": "click",
+            "target": "main",
+            "selectors": [
+                [
+                    "div:nth-of-type(4) button"
+                ],
+                [
+                    "xpath//html/body/div/div/div[2]/div[4]/div/button"
+                ],
+                [
+                    "pierce/div:nth-of-type(4) button"
+                ]
+            ],
+            "offsetY": 17.614028930664062,
+            "offsetX": 86.012451171875
+        },
+        {
+            "type": "click",
+            "target": "main",
+            "selectors": [
+                [
+                    "div:nth-of-type(3) button"
+                ],
+                [
+                    "xpath//html/body/div/div/div[2]/div[3]/div/button"
+                ],
+                [
+                    "pierce/div:nth-of-type(3) button"
+                ]
+            ],
+            "offsetY": 16.20306396484375,
+            "offsetX": 57.012451171875
+        },
+        {
+            "type": "click",
+            "target": "main",
+            "selectors": [
+                [
+                    "div:nth-of-type(2) > div:nth-of-type(2) button"
+                ],
+                [
+                    "xpath//html/body/div/div/div[2]/div[2]/div/button"
+                ],
+                [
+                    "pierce/div:nth-of-type(2) > div:nth-of-type(2) button"
+                ]
+            ],
+            "offsetY": 20.05675506591797,
+            "offsetX": 92.375
+        },
+        {
+            "type": "click",
+            "target": "main",
+            "selectors": [
+                [
+                    "aria/Remonter"
+                ],
+                [
+                    "body > div > div > div:nth-of-type(1) > button"
+                ],
+                [
+                    "xpath//html/body/div/div/div[1]/button"
+                ],
+                [
+                    "pierce/body > div > div > div:nth-of-type(1) > button"
+                ],
+                [
+                    "text/Remonter"
+                ]
+            ],
+            "offsetY": 11.017463009804487,
+            "offsetX": 401.8125
+        }
+    ]
+}

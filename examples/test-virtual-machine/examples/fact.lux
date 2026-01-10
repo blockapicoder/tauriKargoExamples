@@ -1,0 +1,6 @@
+  call clear();
+  fun fact(n); 
+  if n==0 ret 1;
+  ret n * fact(n-1);
+  setGlobal R = fact(4);
+  call print(R);

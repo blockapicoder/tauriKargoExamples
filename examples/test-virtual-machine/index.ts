@@ -3,7 +3,11 @@ import * as vm from "./model"
 import { parse } from "./parser"
 import * as cm from "./codemirror-module"
 import { defineVue, boot } from "./node_modules/tauri-kargo-tools/src/vue"
+import { TauriKargoClient, createClient } from "./node_modules/tauri-kargo-tools/src/api"
 
+
+
+const client = createClient()
 cm.CodeMirror.defineSimpleMode("luxlang", {
     start: [
         { regex: /"(?:[^\\]|\\.)*?"/, token: "string" },
@@ -28,19 +32,82 @@ cm.CodeMirror.defineSimpleMode("luxlang", {
     },
 });
 
+class DialogCreerScript {
+    nom: string = ""
+    editor!: Editor
+    peutCreer = false
+
+    verifier() {
+        this.peutCreer = this.editor.scriptNames.every((n) => n != this.nom.trim().toLocaleLowerCase())
+
+    }
+
+
+    async creer() {
+
+        this.editor.dialogCreerScript = undefined
+    }
+    annuler() {
+        this.editor.dialogCreerScript = undefined
+
+    }
+}
+defineVue(DialogCreerScript, (vue) => {
+    vue.flow({ orientation: 'column', gap: 10 }, () => {
+        vue.input({ name: "nom", update: "verifier" })
+        vue.flow({
+            orientation: "row",
+            gap: 10
+        }, () => {
+            vue.staticButton({ action: "creer", label: "Creer", width: '50%', enable: "peutCreer" })
+            vue.staticButton({ action: "annuler", label: "Annuler", width: '50%' })
+        })
+
+    })
+
+})
 class Editor {
 
     editeur!: HTMLTextAreaElement
     div!: HTMLDivElement
     sortie: string = ""
+    message: string = ""
     codemirror: any
+    scriptNames: string[] = []
+    selections: number[] = []
+    dialogCreerScript?: DialogCreerScript
+    estExecutable = false
     constructor() {
+
+    }
+    println(src: string) {
+        this.sortie += src + "\n"
+
+    }
+    async selectScript() {
+        if (this.selections.length === 0) {
+            this.codemirror.setValue("")
+            return
+        }
+        this.codemirror.setValue(await client.readFileText(this.scriptNames[this.selections[0]]))
+
+
+    }
+    nameScript(name: string): string {
+        return name
+    }
+    addScript() {
+        this.dialogCreerScript = new DialogCreerScript()
+        this.dialogCreerScript.editor = this
+
+    }
+    removeScript() {
 
     }
     async run() {
         const PRIMS = {
-            cr:()=> {
-                this.sortie+="\n"
+            cr: () => {
+                this.sortie += "\n"
             },
             print: (s: any) => {
                 if (typeof s === "string") {
@@ -65,11 +132,17 @@ class Editor {
             concat: (...args: any[][]) => args.flatMap((e) => e)
         }
         const prog = await parse(this.codemirror.getValue())
-        console.log(JSON.stringify(prog,null,2))
+        console.log(JSON.stringify(prog, null, 2))
         const js = vm.generateProg(prog)
-        const run = eval(js) as (prims: any) => any
+        try {
+            const run = eval(js) as (prims: any) => any
 
-        run(PRIMS)
+            run(PRIMS)
+            this.message = "Execution ✅ Succès"
+        } catch (e: any) {
+            this.message = e.message + " ❌ Erreur "
+
+        }
     }
     creerEditeur(): HTMLDivElement {
 
@@ -78,23 +151,17 @@ class Editor {
 
         return this.div
     }
-    init() {
+    async init() {
         const shadow = this.div.shadowRoot ?? this.div.attachShadow({ mode: "open" });
         shadow.innerHTML = "";
 
-        // (Optionnel mais souvent nécessaire) donner une hauteur
-        const style = document.createElement("style");
-        style.textContent = `
-    :host { display: block; }
-    .CodeMirror { height: 100%; }
-  `;
-        shadow.appendChild(style);
+
 
         // Charger CSS AVANT de créer CodeMirror
         const cssReady = this.ensureCodemirrorCss(shadow);
 
         const ta = document.createElement("textarea");
-        ta.value = "Tessst"; // fromTextArea lit ça, pas options.value
+        ta.value = ""; // fromTextArea lit ça, pas options.value
         shadow.appendChild(ta);
 
         this.codemirror = cm.CodeMirror.fromTextArea(ta, {
@@ -103,9 +170,29 @@ class Editor {
             theme: "default",
             tabSize: 2,
         });
+        this.codemirror.on("change", async (instance: any, changeObj: any) => {
+            const code = instance.getValue();
+            try {
+                const prog = await parse(this.codemirror.getValue())
+                this.message = "Compile ✅ Succès"
+                this.estExecutable = true
 
+            } catch (e: any) {
+                this.message = e.message + " ❌ Erreur "
+                this.estExecutable = false
+
+            }
+            console.log("Code modifié, longueur:", code.length, "origin:", changeObj.origin);
+        });
         // Important en Shadow DOM : refresh après chargement CSS + layout
         Promise.resolve(cssReady).then(() => requestAnimationFrame(() => this.codemirror.refresh()));
+        const config = await client.getConfig()
+        await client.setCurrentDirectory({ path: `${config.code}/examples` })
+        const rep = await client.explorer({ path: `${config.code}/examples` })
+        if (rep.type === "directory") {
+            this.scriptNames = rep.content.map((e) => e.name)
+        }
+
     }
 
     ensureCodemirrorCss(root: ShadowRoot) {
@@ -136,11 +223,27 @@ class Editor {
 
 }
 defineVue(Editor, (vue) => {
-    vue.flow({ orientation: "column" }, () => {
-        vue.custom({ factory: "creerEditeur", width: "100%", height: "100%", init: "init" })
-        vue.staticButton({ action: "run", label: "Run" })
-        vue.label("sortie")
 
+    vue.flow({ orientation: "row", gap: 5 }, () => {
+        vue.flow({ orientation: "column", gap: 5 }, () => {
+            vue.flow({
+                orientation: "row", gap: 5
+            }, () => {
+                vue.staticButton({ action: "run", label: "Run", enable: "estExecutable" })
+                vue.staticButton({ action: "removeScript", label: "Remove script" })
+                vue.menu({ name: "dialogCreerScript", action: "addScript", label: "Add script" })
+
+            })
+            vue.select({ list: "scriptNames", displayMethod: "nameScript", selection: "selections", update: "selectScript", height: "80%" })
+
+
+        })
+        vue.flow({ orientation: "column", width: "80%", gap: 5 }, () => {
+            vue.custom({ factory: "creerEditeur", width: "100%", height: "100%", init: "init" })
+            vue.label("message")
+            vue.label("sortie")
+
+        })
     })
 
 

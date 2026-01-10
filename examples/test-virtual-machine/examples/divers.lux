@@ -1,0 +1,18 @@
+  call clear();
+  fun fact(n); 
+  if n==0 ret 1;
+  ret n * fact(n-1);
+  setGlobal R = fact(4);
+  call print(R);
+
+setGlobal l=concat(array(1,2),array(-3,4));
+call print(l);
+fun p(x,y);
+if x >  y ret true;
+ret false;
+call cr();
+call print(filter(l,cur(p,2)));
+fun f(x,y);
+ret x*y;
+call cr();
+call print(map(l,cur(f,2)));
