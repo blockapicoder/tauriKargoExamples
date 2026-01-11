@@ -126,10 +126,12 @@ class Editor {
                 }
 
             },
-            array: (...args: any[]) => args,
+            createArray: (...args: any[]) => args,
             map: (lst: any[], f: (o: any) => any) => lst.map(f),
             filter: (lst: any[], f: (o: any) => boolean) => lst.filter(f),
-            concat: (...args: any[][]) => args.flatMap((e) => e)
+            concat: (...args: any[][]) => args.flatMap((e) => e),
+            all: (a: any[], p: (e: any) => boolean) => { return a.every(p) },
+            exist: (a: any[], p: (e: any) => boolean) => { return a.some(p) }
         }
         const prog = await parse(this.codemirror.getValue())
         console.log(JSON.stringify(prog, null, 2))

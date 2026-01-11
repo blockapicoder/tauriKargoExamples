@@ -1,0 +1,1107 @@
+<!doctype html>
+<html lang="fr">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Jeu de Réduction — Base → Racine</title>
+    <style>
+        :root {
+            --bg: #0b0d12;
+            --panel: #121827;
+            --panel2: #0f1422;
+            --text: #e8ecf1;
+            --muted: #9aa7b6;
+            --border: rgba(255, 255, 255, .10);
+            --accent: #7aa2ff;
+            --danger: #ff6b6b;
+            --ok: #4ade80;
+            --shadow: 0 10px 30px rgba(0, 0, 0, .35);
+            --radius: 16px;
+            --token: 28px;
+            --token-lg: 34px;
+            --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            font-family: var(--font);
+            background: radial-gradient(1200px 800px at 20% 0%, #132040, transparent 60%),
+                radial-gradient(900px 700px at 80% 10%, #2a153f, transparent 55%),
+                var(--bg);
+            color: var(--text);
+        }
+
+        header {
+            padding: 16px 18px;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(180deg, rgba(255, 255, 255, .04), transparent);
+        }
+
+        header .row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        h1 {
+            font-size: 16px;
+            margin: 0;
+            letter-spacing: .2px;
+            font-weight: 650;
+        }
+
+        .sub {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 4px;
+        }
+
+        main {
+            padding: 18px;
+            display: grid;
+            grid-template-columns: 1.25fr .95fr;
+            gap: 16px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 980px) {
+            main {
+                grid-template-columns: 1fr
+            }
+        }
+
+        .card {
+            background: linear-gradient(180deg, rgba(255, 255, 255, .03), transparent 65%), var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .card .hd {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            background: rgba(0, 0, 0, .12);
+        }
+
+        .card .hd .title {
+            font-weight: 650;
+            font-size: 13px;
+            letter-spacing: .2px;
+        }
+
+        .card .bd {
+            padding: 14px;
+        }
+
+        .grid2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        button {
+            background: rgba(255, 255, 255, .06);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: transform .03s ease, background .15s ease, border-color .15s ease;
+            user-select: none;
+        }
+
+        button:hover {
+            background: rgba(255, 255, 255, .10);
+            border-color: rgba(255, 255, 255, .20);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button.primary {
+            background: rgba(122, 162, 255, .18);
+            border-color: rgba(122, 162, 255, .35);
+        }
+
+        button.primary:hover {
+            background: rgba(122, 162, 255, .24);
+            border-color: rgba(122, 162, 255, .45);
+        }
+
+        button.danger {
+            background: rgba(255, 107, 107, .14);
+            border-color: rgba(255, 107, 107, .30);
+        }
+
+        button.danger:hover {
+            background: rgba(255, 107, 107, .18);
+            border-color: rgba(255, 107, 107, .40);
+        }
+
+        button.ghost {
+            background: transparent;
+        }
+
+        button:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+        }
+
+        .pill {
+            display: inline-flex;
+            gap: 8px;
+            align-items: center;
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, .04);
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .pill strong {
+            color: var(--text);
+            font-weight: 650;
+        }
+
+        .kv {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .token {
+            width: var(--token);
+            height: var(--token);
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, .18);
+            box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .15);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            flex: 0 0 auto;
+        }
+
+        .token.lg {
+            width: var(--token-lg);
+            height: var(--token-lg);
+            font-size: 12px;
+        }
+
+        .token .dot {
+            width: 100%;
+            height: 100%;
+            border-radius: inherit;
+        }
+
+        .token .label {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: -16px;
+            font-size: 10px;
+            color: rgba(232, 236, 241, .85);
+            white-space: nowrap;
+            opacity: .90;
+        }
+
+        .token.match {
+            outline: 2px solid rgba(74, 222, 128, .75);
+            outline-offset: 2px;
+        }
+
+        .token.cursor::before {
+            content: "";
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 10px;
+            height: 10px;
+            background: var(--accent);
+            border-radius: 2px;
+            box-shadow: 0 0 0 2px rgba(0, 0, 0, .35);
+        }
+
+        .baseStrip {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 10px;
+            padding: 6px;
+            background: rgba(0, 0, 0, .18);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            min-height: 70px;
+            align-items: flex-start;
+        }
+
+        .rules {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            max-height: 70vh;
+            overflow: auto;
+            padding-right: 4px;
+        }
+
+        .ruleCard {
+            padding: 10px;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            background: linear-gradient(180deg, rgba(255, 255, 255, .03), transparent), rgba(0, 0, 0, .14);
+            cursor: pointer;
+        }
+
+        .ruleCard:hover {
+            border-color: rgba(255, 255, 255, .20);
+            background: rgba(255, 255, 255, .05);
+        }
+
+        .ruleCard.selected {
+            border-color: rgba(122, 162, 255, .55);
+            background: rgba(122, 162, 255, .10);
+        }
+
+        .ruleLine {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .arrow {
+            color: var(--muted);
+            font-size: 12px;
+            margin: 0 2px;
+        }
+
+        .mini {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 6px;
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .treeBox {
+            background: rgba(0, 0, 0, .18);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 10px;
+            max-height: 36vh;
+            overflow: auto;
+        }
+
+        .treeBox ul {
+            margin: 6px 0 0 18px;
+            padding: 0;
+        }
+
+        .treeBox li {
+            margin: 6px 0;
+            list-style: none;
+            position: relative;
+        }
+
+        .treeBox li::before {
+            content: "";
+            position: absolute;
+            left: -10px;
+            top: 12px;
+            width: 8px;
+            height: 1px;
+            background: rgba(255, 255, 255, .16);
+        }
+
+        .status {
+            padding: 10px 12px;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            background: rgba(0, 0, 0, .18);
+            color: var(--muted);
+            font-size: 12px;
+            min-height: 42px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .status .msg {
+            color: var(--text);
+        }
+
+        .status .ok {
+            color: var(--ok);
+            font-weight: 650;
+        }
+
+        .status .bad {
+            color: var(--danger);
+            font-weight: 650;
+        }
+
+        .overlay {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, .55);
+            backdrop-filter: blur(5px);
+            padding: 18px;
+        }
+
+        .overlay.show {
+            display: flex;
+        }
+
+        .modal {
+            width: min(520px, 100%);
+            border-radius: 18px;
+            border: 1px solid rgba(255, 255, 255, .18);
+            background: linear-gradient(180deg, rgba(255, 255, 255, .05), transparent), rgba(10, 12, 18, .92);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
+            padding: 16px;
+        }
+
+        .modal h2 {
+            margin: 0 0 8px 0;
+            font-size: 16px;
+        }
+
+        .modal p {
+            margin: 0 0 14px 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .kbd {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 11px;
+            padding: 2px 6px;
+            border: 1px solid rgba(255, 255, 255, .18);
+            border-bottom-color: rgba(255, 255, 255, .08);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, .06);
+            color: rgba(232, 236, 241, .92);
+        }
+
+        .sep {
+            height: 1px;
+            background: var(--border);
+            margin: 10px 0;
+        }
+
+        .small {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        input[type="number"] {
+            width: 90px;
+            padding: 10px 10px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: rgba(0, 0, 0, .20);
+            color: var(--text);
+            outline: none;
+        }
+
+        label {
+            font-size: 12px;
+            color: var(--muted);
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="row">
+            <div>
+                <h1>Jeu de Réduction — Appliquer les règles pour remonter à la racine</h1>
+                <div class="sub">
+                    Contrôles: <span class="kbd">←</span> <span class="kbd">→</span> (curseur),
+                    <span class="kbd">Entrée</span> (appliquer),
+                    <span class="kbd">U</span> (retour + pénalité).
+                </div>
+            </div>
+            <div class="row">
+                <div class="pill">Niveau <strong id="lvl">1</strong></div>
+                <div class="pill">Temps <strong id="time">00:00.0</strong></div>
+                <div class="pill">Pénalité <strong id="penalty">+0.0s</strong></div>
+                <div class="pill">Arbre <strong id="treeState">masqué</strong></div>
+                <button class="ghost" id="btnHelp">Aide</button>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Zone Base + Contrôles -->
+        <section class="card">
+            <div class="hd">
+                <div class="title">Base actuelle</div>
+                <div class="row">
+                    <div class="kv">Objectif: <span id="goalToken"></span></div>
+                    <button id="btnNewLevel" class="primary">Nouveau niveau</button>
+                </div>
+            </div>
+            <div class="bd">
+                <div class="status" id="status">
+                    <div class="msg">Sélectionnez une règle, placez le curseur, puis appliquez.</div>
+                    <div class="small">Matches: <span id="matches">—</span></div>
+                </div>
+
+                <div style="height:10px"></div>
+
+                <div class="baseStrip" id="baseStrip"></div>
+
+                <div style="height:12px"></div>
+
+                <div class="row">
+                    <button id="btnLeft">←</button>
+                    <button id="btnRight">→</button>
+                    <button id="btnApply" class="primary">Appliquer la règle</button>
+                    <button id="btnUndo" class="danger">Retour (pénalité)</button>
+                </div>
+
+                <div style="height:14px"></div>
+
+            
+              
+       
+       
+
+                    <div class="card" style="border-radius:14px; box-shadow:none; background:var(--panel2)">
+                        <div class="hd">
+                            <div class="title">Arbre (indice)</div>
+                            <button id="btnToggleTree" class="ghost">Afficher/Masquer</button>
+                        </div>
+                        <div class="bd">
+                            <div class="treeBox" id="treeBox" style="display:none;"></div>
+                        </div>
+                    </div>
+              
+
+            </div>
+        </section>
+
+        <!-- Zone Règles -->
+        <aside class="card">
+            <div class="hd">
+                <div class="title">Règles disponibles</div>
+                <div class="pill">Règles <strong id="rulesInfo">0</strong></div>
+                <div class="pill">Usages <strong id="usesInfo">0</strong></div>
+            </div>
+            <div class="bd">
+                <div class="rules" id="rules"></div>
+                <div class="sep"></div>
+                <div class="small">
+                    Une règle s’applique si, à la position du curseur, la base contient exactement la séquence
+                    <em>enfants</em>.
+                    Elle est alors remplacée par la couleur <em>parent</em>. Chaque règle a un nombre d’usages égal au
+                    nombre
+                    d’occurrences retournées par <code>regles(arbre)</code>.
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <div class="overlay" id="overlay">
+        <div class="modal">
+            <h2 id="modalTitle">Victoire</h2>
+            <p id="modalBody"></p>
+            <div class="row" style="justify-content:flex-end">
+                <button id="btnNext" class="primary">Niveau suivant</button>
+                <button id="btnClose">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="overlay" id="help">
+        <div class="modal">
+            <h2>Aide rapide</h2>
+            <p>
+                Vous partez de la <strong>base</strong> (feuilles de l’arbre). Le but est d’appliquer des règles pour
+                réduire la séquence jusqu’à obtenir <strong>la couleur racine</strong> (objectif).
+                Afficher l’arbre ajoute une pénalité et bloque l’application des règles tant qu’il est visible.
+            </p>
+            <div class="sep"></div>
+            <div class="small">
+                <div><span class="kbd">←</span> <span class="kbd">→</span> déplacer le curseur</div>
+                <div><span class="kbd">Entrée</span> appliquer la règle sélectionnée (si arbre masqué)</div>
+                <div><span class="kbd">U</span> retour (undo) avec pénalité</div>
+            </div>
+            <div class="sep"></div>
+            <div class="row" style="justify-content:flex-end">
+                <button id="btnHelpClose" class="primary">Compris</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Implémentation JS.
+         * - Règles regroupées: même (couleur,parentBase) => compteur "uses".
+         * - Application: décrémente uses; supprime la règle à 0.
+         * - Undo restaure base + curseur + règles (snapshot).
+         * - Arbre visible => application interdite; ouverture ajoute pénalité.
+         */
+
+        const Couleurs = ["rouge", "bleue", "vert", "noir", "jaune", "orange", "blanc", "rose", "violet", "marron", "gris"];
+
+        const CSS_COLOR = {
+            rouge: "red",
+            bleue: "dodgerblue",
+            vert: "limegreen",
+            noir: "black",
+            jaune: "gold",
+            orange: "orange",
+            blanc: "white",
+            rose: "hotpink",
+            violet: "purple",
+            marron: "saddlebrown",
+            gris: "gray",
+        };
+
+        function randInt(a, b) { return Math.floor(Math.random() * (b - a + 1)) + a; }
+        function choice(arr) { return arr[randInt(0, arr.length - 1)]; }
+        function shuffle(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+
+        /** Arbre: { couleur, enfants: Arbre[] } */
+        function base(arbre) {
+            if (!arbre.enfants || arbre.enfants.length === 0) return [arbre.couleur];
+            return arbre.enfants.flatMap(e => base(e));
+        }
+        function regles(arbre) {
+            if (!arbre.enfants || arbre.enfants.length === 0) return [];
+            const regle = { couleur: arbre.couleur, base: arbre.enfants.map(e => e.couleur) };
+            return [...arbre.enfants.flatMap(e => regles(e)), regle];
+        }
+        function indexOfBase(pattern, baseArr) {
+            const r = [];
+            for (let i = 0; i < baseArr.length; i++) {
+                let ok = true;
+                for (let j = 0; j < pattern.length; j++) {
+                    if (i + j >= baseArr.length) { ok = false; break; }
+                    if (pattern[j] !== baseArr[i + j]) { ok = false; break; }
+                }
+                if (ok) r.push(i);
+            }
+            return r;
+        }
+        function transform(regle, baseArr, idx) {
+            const len = regle.base.length;
+            if (idx < 0) return baseArr;
+            if (idx + len > baseArr.length) return baseArr;
+            for (let i = 0; i < len; i++) {
+                if (baseArr[idx + i] !== regle.base[i]) return baseArr;
+            }
+            return [
+                ...baseArr.slice(0, idx),
+                regle.couleur,
+                ...baseArr.slice(idx + len)
+            ];
+        }
+
+        /** Génération de niveaux */
+        const LEVELS = [
+            { depth: 2, maxChildren: 2, leafChance: 0.10 },
+            { depth: 3, maxChildren: 2, leafChance: 0.14 },
+            { depth: 3, maxChildren: 3, leafChance: 0.18 },
+            { depth: 4, maxChildren: 3, leafChance: 0.22 },
+            { depth: 4, maxChildren: 4, leafChance: 0.26 },
+            { depth: 5, maxChildren: 4, leafChance: 0.30 },
+            { depth: 6, maxChildren: 4, leafChance: 0.34 },
+            { depth: 7, maxChildren: 4, leafChance: 0.38 },
+        ];
+
+        function pickColorDifferent(excluded) {
+            let c = choice(Couleurs);
+            let tries = 0;
+            const ex = new Set(excluded || []);
+            while (ex.has(c) && tries++ < 30) c = choice(Couleurs);
+            return c;
+        }
+
+        function genTree(settings, depthLeft) {
+            const { maxChildren, leafChance } = settings;
+            if (depthLeft <= 0 || Math.random() < leafChance) {
+                return { couleur: choice(Couleurs), enfants: [] };
+            }
+            const k = randInt(2, Math.max(2, maxChildren));
+            const enfants = [];
+            for (let i = 0; i < k; i++) {
+                enfants.push(genTree(settings, depthLeft - 1));
+            }
+            const childrenColors = enfants.map(e => e.couleur);
+            const couleur = pickColorDifferent(childrenColors);
+            return { couleur, enfants };
+        }
+
+        /** Règles regroupées avec compteur uses */
+        function ruleKey(couleur, baseArr) {
+            return `${couleur}|${baseArr.join(",")}`;
+        }
+        function groupRules(rawRules) {
+            const map = new Map(); // key -> { key, couleur, base, uses }
+            for (const r of rawRules) {
+                const k = ruleKey(r.couleur, r.base);
+                const cur = map.get(k);
+                if (cur) {
+                    cur.uses += 1;
+                } else {
+                    map.set(k, { key: k, couleur: r.couleur, base: r.base.slice(), uses: 1 });
+                }
+            }
+            return Array.from(map.values());
+        }
+
+        /** Rendu */
+        function tokenEl(couleur, { label = false, large = false } = {}) {
+            const t = document.createElement("div");
+            t.className = "token" + (large ? " lg" : "");
+            t.dataset.color = couleur;
+
+            const d = document.createElement("div");
+            d.className = "dot";
+            d.style.background = CSS_COLOR[couleur] || "magenta";
+
+            // lisibilité
+            if (couleur === "noir") {
+                d.style.boxShadow = "inset 0 0 0 1px rgba(255,255,255,.25)";
+            }
+            if (couleur === "blanc") {
+                d.style.boxShadow = "inset 0 0 0 1px rgba(0,0,0,.35)";
+            }
+
+            t.appendChild(d);
+
+            if (label) {
+                const l = document.createElement("div");
+                l.className = "label";
+                l.textContent = couleur;
+                t.appendChild(l);
+            }
+            return t;
+        }
+
+        function fmtTime(ms) {
+            const s = ms / 1000;
+            const mm = Math.floor(s / 60);
+            const ss = s - mm * 60;
+            const mmStr = String(mm).padStart(2, "0");
+            const ssStr = String(ss.toFixed(1)).padStart(4, "0");
+            return `${mmStr}:${ssStr}`;
+        }
+
+        /** Etat de jeu */
+        let levelIndex = 0;
+        let arbre = null;
+        let goal = null;
+        let rulesAll = []; // { key, couleur, base, uses }
+        let selectedRuleIndex = -1;
+
+        let currentBase = [];
+        let cursor = 0;
+
+        // history snapshot complet (simple, robuste)
+        let history = []; // { base:[], cursor:number, rulesAllSnapshot:[], selectedRuleIndex:number }
+
+        let startedAt = 0;
+        let penaltyMs = 0;
+        let timerId = null;
+        let treeVisible = false;
+
+        const $ = (id) => document.getElementById(id);
+
+        function setStatus(text, kind = "") {
+            const status = $("status");
+            const msg = status.querySelector(".msg");
+            msg.textContent = text;
+            msg.className = "msg" + (kind ? " " + kind : "");
+        }
+
+        function updateTimer() {
+            const now = performance.now();
+            const elapsed = (now - startedAt) + penaltyMs;
+            $("time").textContent = fmtTime(elapsed);
+            $("penalty").textContent = `+${(penaltyMs / 1000).toFixed(1)}s`;
+        }
+
+        function startTimer() {
+            if (timerId) clearInterval(timerId);
+            startedAt = performance.now();
+            penaltyMs = 0;
+            timerId = setInterval(updateTimer, 100);
+            updateTimer();
+        }
+
+        function stopTimer() {
+            if (timerId) clearInterval(timerId);
+            timerId = null;
+        }
+
+        function clampCursor() {
+            if (cursor < 0) cursor = 0;
+            if (cursor >= currentBase.length) cursor = Math.max(0, currentBase.length - 1);
+        }
+
+        function currentRule() {
+            if (selectedRuleIndex < 0) return null;
+            return rulesAll[selectedRuleIndex] || null;
+        }
+
+        function renderGoal() {
+            const goalHost = $("goalToken");
+            goalHost.innerHTML = "";
+            goalHost.appendChild(tokenEl(goal, { label: true, large: true }));
+        }
+
+        function renderRulesInfo() {
+            $("rulesInfo").textContent = String(rulesAll.length);
+            const totalUses = rulesAll.reduce((a, r) => a + r.uses, 0);
+            $("usesInfo").textContent = String(totalUses);
+        }
+
+        function renderBase() {
+            const strip = $("baseStrip");
+            strip.innerHTML = "";
+
+            const rule = currentRule();
+            let matchPositions = [];
+            if (rule) matchPositions = indexOfBase(rule.base, currentBase);
+
+            $("matches").textContent = (rule ? (matchPositions.length ? matchPositions.join(", ") : "aucun") : "—");
+
+            currentBase.forEach((c, i) => {
+                const t = tokenEl(c, { label: true });
+                if (i === cursor) t.classList.add("cursor");
+                // if(matchPositions.includes(i)) t.classList.add("match");
+
+                t.addEventListener("click", () => {
+                    cursor = i;
+                    renderBase();
+                });
+                strip.appendChild(t);
+            });
+
+            if (currentBase.length === 0) {
+                setStatus("Base vide (état invalide). Relancez un niveau.", "bad");
+            }
+        }
+
+        function renderRules() {
+            const host = $("rules");
+            host.innerHTML = "";
+
+            rulesAll.forEach((r, idx) => {
+                const card = document.createElement("div");
+                card.className = "ruleCard" + (idx === selectedRuleIndex ? " selected" : "");
+
+                const line = document.createElement("div");
+                line.className = "ruleLine";
+
+                r.base.forEach(col => line.appendChild(tokenEl(col)));
+                const ar = document.createElement("div");
+                ar.className = "arrow";
+                ar.textContent = "→";
+                line.appendChild(ar);
+                line.appendChild(tokenEl(r.couleur));
+
+                card.appendChild(line);
+
+                const mini = document.createElement("div");
+                mini.className = "mini";
+                const left = document.createElement("div");
+                left.textContent = `enfants: ${r.base.length}`;
+                const right = document.createElement("div");
+                right.textContent = `restant: ${r.uses}`;
+                mini.appendChild(left); mini.appendChild(right);
+                card.appendChild(mini);
+
+                card.addEventListener("click", () => {
+                    selectedRuleIndex = idx;
+                    renderRules();
+                    renderBase();
+                });
+
+                // double-clic = appliquer (si autorisé)
+                card.addEventListener("dblclick", () => {
+                    selectedRuleIndex = idx;
+                    renderRules();
+                    renderBase();
+                    applyRule();
+                });
+
+                host.appendChild(card);
+            });
+
+            renderRulesInfo();
+        }
+
+        function renderTree() {
+            const box = $("treeBox");
+            box.innerHTML = "";
+            if (!arbre) return;
+
+            const build = (node) => {
+                const li = document.createElement("li");
+                const row = document.createElement("div");
+                row.className = "row";
+                row.appendChild(tokenEl(node.couleur, { label: true }));
+                li.appendChild(row);
+
+                if (node.enfants && node.enfants.length) {
+                    const ul = document.createElement("ul");
+                    ul.style.transform = "translateX(40px)"
+                    node.enfants.forEach(ch => ul.appendChild(build(ch)));
+                    li.appendChild(ul);
+                }
+                return li;
+            };
+
+            const ul = document.createElement("ul");
+            ul.appendChild(build(arbre));
+            box.appendChild(ul);
+        }
+
+        function showModal(title, body) {
+            $("modalTitle").textContent = title;
+            $("modalBody").textContent = body;
+            $("overlay").classList.add("show");
+        }
+        function closeModal() {
+            $("overlay").classList.remove("show");
+        }
+
+        function snapshotRules() {
+            return rulesAll.map(r => ({ key: r.key, couleur: r.couleur, base: r.base.slice(), uses: r.uses }));
+        }
+        function restoreRules(snapshot) {
+            rulesAll = snapshot.map(r => ({ key: r.key, couleur: r.couleur, base: r.base.slice(), uses: r.uses }));
+        }
+
+        function setTreeVisible(v, { penalize = false } = {}) {
+            treeVisible = v;
+            $("treeState").textContent = treeVisible ? "visible" : "masqué";
+            $("treeBox").style.display = treeVisible ? "block" : "none";
+
+            // interdire application quand visible
+            $("btnApply").disabled = treeVisible;
+
+            if (treeVisible) {
+                if (penalize) {
+                    const p = Math.max(0, parseFloat( "15"));
+                    penaltyMs += p * 1000;
+                    setStatus(`Arbre affiché (+${p.toFixed(1)}s). Application des règles désactivée.`, "bad");
+                } else {
+                    setStatus("Arbre affiché. Application des règles désactivée.", "bad");
+                }
+            } else {
+                setStatus("Arbre masqué. Vous pouvez appliquer des règles.", "");
+            }
+
+            renderBase();
+        }
+
+        function newLevel(index) {
+            levelIndex = Math.max(0, index);
+            $("lvl").textContent = String(levelIndex + 1);
+
+            const settings = LEVELS[Math.min(levelIndex, LEVELS.length - 1)];
+            arbre = genTree(settings, settings.depth);
+
+            goal = arbre.couleur;
+
+            // règles brutes puis regroupées avec uses
+            const raw = regles(arbre);
+            rulesAll = groupRules(raw);
+            shuffle(rulesAll);
+
+            currentBase = base(arbre);
+            cursor = 0;
+            history = [];
+            selectedRuleIndex = -1;
+
+            renderGoal();
+            renderRules();
+            renderBase();
+            renderTree();
+
+            setTreeVisible(false, { penalize: false });
+            startTimer();
+
+            setStatus(`Niveau ${levelIndex + 1}: réduisez la base jusqu'à obtenir la racine (${goal}).`);
+        }
+
+        function winCheck() {
+            if (currentBase.length === 1 && currentBase[0] === goal) {
+                stopTimer();
+                const now = performance.now();
+                const elapsed = (now - startedAt) + penaltyMs;
+                showModal("Victoire",
+                    `Vous avez atteint la racine (${goal}) en ${fmtTime(elapsed)} (pénalités incluses).`);
+                return true;
+            }
+            return false;
+        }
+
+        function applyRule() {
+            if (treeVisible) {
+                setStatus("Impossible d’appliquer une règle tant que l’arbre est affiché.", "bad");
+                return;
+            }
+
+            const rule = currentRule();
+            if (!rule) {
+                setStatus("Sélectionnez une règle.", "bad");
+                return;
+            }
+            clampCursor();
+
+            const before = currentBase;
+            const after = transform(rule, before, cursor);
+
+            const changed = (after.length !== before.length) || after.some((v, i) => v !== before[i]);
+            if (!changed) {
+                setStatus("Règle non applicable à la position du curseur.", "bad");
+                return;
+            }
+
+            // snapshot complet pour undo
+            history.push({
+                base: before.slice(),
+                cursor,
+                rulesAllSnapshot: snapshotRules(),
+                selectedRuleIndex
+            });
+
+            // appliquer base
+            currentBase = after;
+            if (cursor >= currentBase.length) cursor = Math.max(0, currentBase.length - 1);
+
+            // décrémenter usages règle
+            rule.uses -= 1;
+            if (rule.uses <= 0) {
+                rulesAll.splice(selectedRuleIndex, 1);
+                if (rulesAll.length === 0) {
+                    selectedRuleIndex = -1;
+                } else if (selectedRuleIndex >= rulesAll.length) {
+                    selectedRuleIndex = rulesAll.length - 1;
+                }
+                setStatus("Transformation appliquée. Règle épuisée: supprimée.", "ok");
+            } else {
+                setStatus("Transformation appliquée.", "ok");
+            }
+
+            renderRules();
+            renderBase();
+            winCheck();
+        }
+
+        function undo() {
+            if (history.length === 0) {
+                setStatus("Aucun retour possible (historique vide).", "bad");
+                return;
+            }
+            const pen = Math.max(0, parseFloat("5"));
+            penaltyMs += pen * 1000;
+
+            const prev = history.pop();
+            currentBase = prev.base;
+            cursor = prev.cursor;
+            restoreRules(prev.rulesAllSnapshot);
+            selectedRuleIndex = prev.selectedRuleIndex;
+
+            setStatus(`Retour appliqué (+${pen.toFixed(1)}s).`, "bad");
+
+            renderRules();
+            renderBase();
+        }
+
+        /** Events UI */
+        $("btnLeft").addEventListener("click", () => { cursor--; clampCursor(); renderBase(); });
+        $("btnRight").addEventListener("click", () => { cursor++; clampCursor(); renderBase(); });
+        $("btnApply").addEventListener("click", applyRule);
+        $("btnUndo").addEventListener("click", undo);
+
+        $("btnNewLevel").addEventListener("click", () => newLevel(levelIndex));
+        $("btnNext").addEventListener("click", () => { closeModal(); newLevel(levelIndex + 1); });
+        $("btnClose").addEventListener("click", closeModal);
+
+    
+     
+
+        $("btnToggleTree").addEventListener("click", () => {
+            const willShow = !treeVisible;
+            setTreeVisible(willShow, { penalize: willShow });
+        });
+
+        $("btnHelp").addEventListener("click", () => $("help").classList.add("show"));
+        $("btnHelpClose").addEventListener("click", () => $("help").classList.remove("show"));
+        $("help").addEventListener("click", (e) => { if (e.target.id === "help") $("help").classList.remove("show"); });
+        $("overlay").addEventListener("click", (e) => { if (e.target.id === "overlay") closeModal(); });
+
+        /** Keyboard */
+        window.addEventListener("keydown", (e) => {
+            if ($("help").classList.contains("show")) return;
+            if ($("overlay").classList.contains("show")) return;
+
+            if (e.key === "ArrowLeft") { cursor--; clampCursor(); renderBase(); e.preventDefault(); }
+            if (e.key === "ArrowRight") { cursor++; clampCursor(); renderBase(); e.preventDefault(); }
+            if (e.key === "Enter") {
+                applyRule();
+                e.preventDefault();
+            }
+            if (e.key.toLowerCase() === "u") {
+                undo();
+                e.preventDefault();
+            }
+        });
+
+        /** Init */
+        newLevel(0);
+    </script>
+</body>
+
+</html>

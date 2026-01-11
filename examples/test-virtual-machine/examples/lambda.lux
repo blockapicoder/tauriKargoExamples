@@ -1,4 +1,4 @@
 call clear();
-setGlobal lst=array(1,2);
-setGlobal list2 = array(5,10,15);
+setGlobal lst=createArray(1,2);
+setGlobal list2 = createArray(5,10,15);
 call print(map(lst,$(x) =>map(list2,$(y)=>y*x)));

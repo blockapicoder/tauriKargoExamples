@@ -7,7 +7,7 @@
   // Ajoute/retire ici selon ton PRIMS runtime.
   // ------------------------------------------------------------
   const KNOWN_PRIMS = new Set([
-    "cr","print","clear","cur","deferredCall",
+    "cr","print","clear","cur","createArray",
     "array","map","filter","concat",
     "+","-","*","/","==","===","!=","<",">","<=",">=","&&","||"
   ]);

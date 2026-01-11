@@ -5,7 +5,7 @@
   setGlobal R = fact(4);
   call print(R);
 
-setGlobal l=concat(array(1,2),array(-3,4));
+setGlobal l=concat(createArray(1,2),createArray(-3,4));
 call print(l);
 fun p(x,y);
 if x >  y ret true;
