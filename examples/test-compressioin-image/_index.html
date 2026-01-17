@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SPI image 256x256 — simplification R/G/B</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 16px; }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+    .panel { border: 1px solid #ddd; border-radius: 8px; padding: 12px; }
+    .panel h2 { margin: 0 0 8px 0; font-size: 16px; }
+    label { display: block; margin: 8px 0 4px; }
+    input, select, button { font-size: 14px; padding: 6px 8px; }
+    button { cursor: pointer; }
+    button[disabled] { cursor: not-allowed; opacity: 0.6; }
+    canvas { border: 1px solid #ddd; image-rendering: pixelated; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .progress { display: grid; grid-template-columns: 32px 1fr; gap: 8px; align-items: center; margin-top: 6px; }
+    .muted { color: #555; }
+    .status { margin-top: 10px; padding: 8px; background: #f6f6f6; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <h1>SPI — simplification de points (R/G/B) sur image 256×256</h1>
+
+  <div class="row">
+    <div class="panel" style="min-width: 360px; flex: 1;">
+      <h2>Paramètres</h2>
+
+      <label>Image (sera redimensionnée en 256×256)</label>
+      <input id="file" type="file" accept="image/*" />
+
+      <label>Type d'interpolation</label>
+      <select id="type">
+        <option value="SIN">SPI (SIN)</option>
+        <option value="RDP">RDP</option>
+        <option value="DP">DP</option>
+      </select>
+
+      <div class="grid">
+        <div>
+          <label>Nombre d'essais (nombreErreur max)</label>
+          <input id="nombreEssai" type="number" min="0" step="1" value="200" />
+        </div>
+        <div>
+          <label>Erreur max (|f(p)-y|)</label>
+          <input id="erreur" type="number" min="0" step="0.1" value="2" />
+        </div>
+        <div>
+          <label>Nombre de retraits max</label>
+          <input id="nombreRetrait" type="number" min="0" step="1" value="200" />
+        </div>
+      </div>
+
+      <div style="margin-top: 12px; display:flex; gap: 10px;">
+        <button id="calculer">Calculer</button>
+        <button id="stop" disabled>Stop</button>
+      </div>
+
+      <div class="status">
+        <div><b>État</b> : <span id="status">en attente</span></div>
+        <div class="muted" style="margin-top:6px;">
+          Remarque: une interpolation globale sur 65 536 points est intractable (O(N²) par évaluation).
+          Cette démo conserve vos schémas (SIN/DP/RDP), mais les applique sur un voisinage local (K=32, rayon ≤ 20px),
+          ce qui permet de traiter une image 256×256.
+        </div>
+      </div>
+
+      <h2 style="margin-top: 12px;">Progression (via stopFct)</h2>
+      <div class="progress"><div class="mono">R</div><div class="mono" id="pr">Retrait: 0 | Test: 0</div></div>
+      <div class="progress"><div class="mono">G</div><div class="mono" id="pg">Retrait: 0 | Test: 0</div></div>
+      <div class="progress"><div class="mono">B</div><div class="mono" id="pb">Retrait: 0 | Test: 0</div></div>
+
+      <div style="margin-top:10px" class="muted">
+        <div><span class="mono">kept</span> (points restants): <span class="mono" id="kept">—</span></div>
+        <div><span class="mono">removed</span> (points retirés): <span class="mono" id="removed">—</span></div>
+        <div><span class="mono">recon</span>: <span class="mono" id="recon">—</span></div>
+      </div>
+    </div>
+
+    <div class="panel" style="flex: 1; min-width: 560px;">
+      <h2>Images</h2>
+      <div style="display:flex; gap: 16px; flex-wrap: wrap;">
+        <div>
+          <div class="muted">Original (redimensionné 256×256)</div>
+          <canvas id="c0" width="256" height="256"></canvas>
+        </div>
+        <div>
+          <div class="muted">Reconstruit (à partir des points simplifiés)</div>
+          <canvas id="c1" width="256" height="256"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // Import de votre module (demande explicite)
+    import './spi.js';
+
+    const file = document.getElementById('file');
+    const typeSel = document.getElementById('type');
+    const nombreEssai = document.getElementById('nombreEssai');
+    const erreur = document.getElementById('erreur');
+    const nombreRetrait = document.getElementById('nombreRetrait');
+    const btnCalc = document.getElementById('calculer');
+    const btnStop = document.getElementById('stop');
+
+    const statusEl = document.getElementById('status');
+    const pr = document.getElementById('pr');
+    const pg = document.getElementById('pg');
+    const pb = document.getElementById('pb');
+
+    const keptEl = document.getElementById('kept');
+    const removedEl = document.getElementById('removed');
+    const reconEl = document.getElementById('recon');
+
+    const c0 = document.getElementById('c0');
+    const c1 = document.getElementById('c1');
+    const ctx0 = c0.getContext('2d', { willReadFrequently: true });
+    const ctx1 = c1.getContext('2d');
+
+    const tmp = document.createElement('canvas');
+    tmp.width = 256;
+    tmp.height = 256;
+    const tmpCtx = tmp.getContext('2d', { willReadFrequently: true });
+
+    let lastImageRGBA = null; // Uint8ClampedArray(256*256*4)
+    let worker = null;
+
+    function setRunning(running) {
+      btnCalc.disabled = running;
+      btnStop.disabled = !running;
+    }
+
+    function setStatus(s) {
+      statusEl.textContent = s;
+    }
+
+    function resetProgress() {
+      pr.textContent = 'Retrait: 0 | Test: 0';
+      pg.textContent = 'Retrait: 0 | Test: 0';
+      pb.textContent = 'Retrait: 0 | Test: 0';
+      keptEl.textContent = '—';
+      removedEl.textContent = '—';
+      reconEl.textContent = '—';
+    }
+
+    async function loadImageTo256(fileObj) {
+      const url = URL.createObjectURL(fileObj);
+      try {
+        const img = new Image();
+        img.decoding = 'async';
+        img.src = url;
+        await img.decode();
+
+        tmpCtx.clearRect(0, 0, 256, 256);
+        tmpCtx.drawImage(img, 0, 0, 256, 256);
+        const imageData = tmpCtx.getImageData(0, 0, 256, 256);
+
+        // Afficher l'original redimensionné
+        ctx0.putImageData(imageData, 0, 0);
+
+        lastImageRGBA = imageData.data;
+        setStatus('image chargée');
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+
+    file.addEventListener('change', async () => {
+      resetProgress();
+      ctx1.clearRect(0, 0, 256, 256);
+      const f = file.files?.[0];
+      if (!f) return;
+      setStatus('chargement image…');
+      await loadImageTo256(f);
+    });
+
+    function ensureWorker() {
+      if (worker) return worker;
+      worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+
+      worker.onmessage = (ev) => {
+        const m = ev.data;
+        if (m.type === 'status') {
+          setStatus(m.message);
+        } else if (m.type === 'progress') {
+          const line = `Retrait: ${m.nbRetrait} | Test: ${m.nbTest}`;
+          if (m.channel === 'R') pr.textContent = line;
+          if (m.channel === 'G') pg.textContent = line;
+          if (m.channel === 'B') pb.textContent = line;
+        } else if (m.type === 'kept') {
+          keptEl.textContent = `R=${m.kept.R} G=${m.kept.G} B=${m.kept.B}`;
+          removedEl.textContent = `R=${m.removed.R} G=${m.removed.G} B=${m.removed.B}`;
+        } else if (m.type === 'reconProgress') {
+          reconEl.textContent = `${Math.floor((m.done / m.total) * 100)}%`;
+        } else if (m.type === 'done') {
+          const out = new Uint8ClampedArray(m.imageBuffer);
+          const id = new ImageData(out, 256, 256);
+          ctx1.putImageData(id, 0, 0);
+          setStatus('terminé');
+          reconEl.textContent = '100%';
+          setRunning(false);
+        } else if (m.type === 'stopped') {
+          setStatus('stoppé');
+          setRunning(false);
+        } else if (m.type === 'error') {
+          console.error(m.message);
+          setStatus('erreur (voir console)');
+          setRunning(false);
+        }
+      };
+      return worker;
+    }
+
+    btnCalc.addEventListener('click', () => {
+      resetProgress();
+      if (!lastImageRGBA) {
+        setStatus('Veuillez d’abord charger une image.');
+        return;
+      }
+
+      setRunning(true);
+      setStatus('démarrage…');
+
+      const w = ensureWorker();
+
+      // Transfer du buffer RGBA (copy -> ArrayBuffer transferable)
+      const buf = new Uint8ClampedArray(lastImageRGBA).buffer;
+
+      w.postMessage({
+        type: 'start',
+        imageBuffer: buf,
+        type: typeSel.value,
+        ctx: {
+          nombreEssai: Number(nombreEssai.value),
+          nombreRetrait: Number(nombreRetrait.value),
+          erreur: Number(erreur.value),
+        },
+      }, [buf]);
+    });
+
+    btnStop.addEventListener('click', () => {
+      if (!worker) return;
+      setStatus('stop demandé…');
+      worker.postMessage({ type: 'stop' });
+    });
+
+    setStatus('en attente');
+  </script>
+</body>
+</html>

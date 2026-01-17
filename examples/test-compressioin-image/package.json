@@ -1,0 +1,20 @@
+{
+  "name": "test-compressioin-image",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "tauri-kargo-tools": "^0.2.3",
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "@types/three": "0.180.0",
+    "@webgpu/types": "^0.1.64"
+  }
+}
