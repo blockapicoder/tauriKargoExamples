@@ -1,5 +1,10 @@
-import { Ctx, P, PointFeature } from "./spec-spi"
-
+import {  P, PointFeature } from "./spec-spi"
+export interface Ctx {
+    nombreEssai: number
+    nombreRetrait: number
+    erreur: number
+    
+}
 export interface DecoupageFeature {
     featuresR: PointFeature<P>[]
     featuresG: PointFeature<P>[]

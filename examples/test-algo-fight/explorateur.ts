@@ -3,8 +3,10 @@ import { boot, defineVue } from "./node_modules/tauri-kargo-tools/src/vue"
 import { createClient, TauriKargoClient } from "./node_modules/tauri-kargo-tools/src/api"
 import { initMonacoFromFilesObject } from "./monaco"
 import { buildLightContext } from "./context"
+import { codeTemplate, Robot } from "./model"
+import { RobotExplorateur } from "./robot-explorateur"
 class Noeud {
-    nom!:string
+    nom!: string
     path!: string
     explorateur!: Explorateur
     constructor() {
@@ -29,28 +31,63 @@ defineVue(Reperoire, {
 })
 
 
-interface ExplorateurTypescriptContext {
-    contexte: TypescriptContext
-    path: string
-}
+
 class DialogCreerProjet {
     nom: string = ""
+    nomRepertoire: string = ""
+    erreur: string = "Saisir nom et nom répertoire"
+
     explorateur!: Explorateur
     peutCreer = false
 
+
     verifier() {
-        this.peutCreer = this.explorateur.noeuds.every( (n)=>n.nom.toLocaleLowerCase() != this.nom.trim().toLocaleLowerCase())
+        this.erreur = ""
+        if (this.nom.trim() === "") {
+            this.erreur = "Nom vide"
+            this.peutCreer = false
+            return;
+        }
+        if (this.nomRepertoire.trim() === "") {
+            this.erreur = "Nom réperoire vide"
+            this.peutCreer = false
+            return;
+        }
+        const cond1 = this.explorateur.noeuds.every((n) => n.nom.toLocaleLowerCase() != this.nomRepertoire.trim().toLocaleLowerCase())
+        const cond2 = this.explorateur.robots.every((n) => n.nom.toLocaleLowerCase() != this.nom.trim().toLocaleLowerCase())
+        if (!cond1) {
+            this.erreur = "Répertoire existant"
+        }
+        if (!cond2) {
+            this.erreur = "Nom existant"
+        }
+        this.peutCreer = cond1 && cond2
 
     }
 
 
     async creer() {
         const racine = this.explorateur.racine
-        await this.explorateur.tauriKargoClient.setCurrentDirectory( { path:this.explorateur.racine})
-    
-        await this.explorateur.tauriKargoClient.createDirectory(this.nom);
-        await this.explorateur.explorer(racine)
-        this.explorateur.dialogCreerProjet = undefined
+        const client = this.explorateur.tauriKargoClient
+        await client.setCurrentDirectory({ path: this.explorateur.racine })
+
+        await client.createDirectory(this.nomRepertoire);
+        const robot: Robot = { nom: this.nom, repertoire: `${racine}/${this.nomRepertoire}` }
+        try {
+
+            await client.setCurrentDirectory({ path: this.nomRepertoire })
+
+            await client.writeFileText("robot.ts", await codeTemplate())
+            await client.setCurrentDirectory({ path: "." })
+            this.explorateur.robots.push(robot)
+            await client.writeFileText("robots.json", JSON.stringify(this.explorateur.robots))
+            await client.setCurrentDirectory({ path: this.explorateur.racine })
+            await this.explorateur.explorer(racine)
+            this.explorateur.dialogCreerProjet = undefined
+        } catch (e: any) {
+            this.erreur = e.message
+
+        }
     }
     annuler() {
         this.explorateur.dialogCreerProjet = undefined
@@ -59,12 +96,16 @@ class DialogCreerProjet {
 }
 defineVue(DialogCreerProjet, (vue) => {
     vue.flow({ orientation: 'column', gap: 10 }, () => {
-        vue.input({ name: "nom" , update:"verifier"})
+        vue.staticLabel("Nom")
+        vue.input({ name: "nom", update: "verifier" })
+        vue.staticLabel("Nom repertoire")
+        vue.input({ name: "nomRepertoire", update: "verifier" })
+        vue.label("erreur", { enable: "peutCreer" })
         vue.flow({
             orientation: "row",
             gap: 10
         }, () => {
-            vue.staticButton({ action: "creer", label: "Creer", width: '50%' , enable:"peutCreer" })
+            vue.staticButton({ action: "creer", label: "Creer", width: '50%', enable: "peutCreer" })
             vue.staticButton({ action: "annuler", label: "Annuler", width: '50%' })
         })
 
@@ -77,12 +118,15 @@ export class Explorateur {
     noeuds: Noeud[] = []
     tauriKargoClient!: TauriKargoClient
     peutRemonter: boolean = false
-    contexte?: ExplorateurTypescriptContext
+    robotExplorateur!:RobotExplorateur
+
     dialogCreerProjet?: DialogCreerProjet
+    robots: Robot[] = []
 
     constructor() {
         this.tauriKargoClient = createClient();
         this.explorerRacine()
+
 
     }
     explorerRacine() {
@@ -132,14 +176,22 @@ export class Explorateur {
         return this.dialogCreerProjet
 
     }
+    async init(div: HTMLDivElement) {
+
+        await this.tauriKargoClient.setCurrentDirectory({ path: "." })
+        try {
+            const src = await this.tauriKargoClient.readFileText("robots.json")
+            this.robots = JSON.parse(src)
+        } catch (e) {
+
+        }
+
+
+    }
     remonter() {
         const e = this.parents.pop()
         if (e) {
-            if (this.contexte) {
-                if (this.contexte.path === this.racine) {
-                    this.contexte = undefined
-                }
-            }
+  
             this.explorer(e)
         }
         this.peutRemonter = this.parents.length > 0
@@ -148,6 +200,9 @@ export class Explorateur {
 
 
 
+    }
+    explorerRobot() {
+        return this.robotExplorateur
     }
 }
 defineVue(Explorateur, (vue) => {
@@ -162,10 +217,10 @@ defineVue(Explorateur, (vue) => {
             orientation: "row",
             gap: 10,
         }, () => {
-            vue.input({ name: "racine", update: "explorerRacine", width: "33%" })
-            vue.staticButton({ label: "Remonter", enable: "peutRemonter", action: "remonter", width: "33%" })
-            vue.dialog({ name: "dialogCreerProjet", action: "creerProjet", label: "Creer projet", buttonWidth: "34%" })
-
+            vue.input({ name: "racine", update: "explorerRacine", width: "25%" })
+            vue.staticButton({ label: "Remonter", enable: "peutRemonter", action: "remonter", width: "25%" })
+            vue.dialog({ name: "dialogCreerProjet", action: "creerProjet", label: "Creer projet", buttonWidth: "25%" })
+            vue.staticBootVue({ factory:"explorerRobot" , label:"Explorer robots",width:"25%"})
         })
         vue.listOfVue({
             list: "noeuds",
@@ -180,63 +235,8 @@ defineVue(Explorateur, (vue) => {
 
 
     })
-})
+}, { init: "init" })
 export interface Content {
     path: string, content?: string
 
 }
-export type TypescriptContext = { [path: string]: Content }
-class MonacoEditor {
-    div!: HTMLDivElement
-    source: string = ""
-    nom!: string
-    repertoire!: string
-    explorateur!: Explorateur
-    titre = "Explorateur"
-    constructor() {
-        this.source = "function test() {\n  console.log('Hello Monaco');\n}\n"
-    }
-
-
-    factory(): HTMLDivElement {
-        this.div = document.createElement("div")
-
-        return this.div
-    }
-    async init() {
-        const basePath = this.explorateur.contexte!.path
-        await this.explorateur.tauriKargoClient.setCurrentDirectory({ path: basePath })
-
-        const filePath = this.repertoire.substring(basePath.length + 1)
-        this.source = await this.explorateur.tauriKargoClient.readFileText(filePath)
-        const ctx = await buildLightContext(this.explorateur.contexte!.contexte, filePath)
-
-        const editor = await initMonacoFromFilesObject(this.div, {
-            files: ctx,
-            entry: filePath,
-            language: "typescript",
-        });
-
-
-    }
-    ouvrirExplorateur(): Explorateur {
-        return this.explorateur
-    }
-
-}
-defineVue(MonacoEditor, {
-    kind: "flow",
-    orientation: "column",
-    height: "100vh",
-    gap: 10,
-    children: [
-        { kind: "bootVue", factory: "ouvrirExplorateur", label: "titre", height: "5%" },
-        {
-            kind: "custom",
-            factory: "factory",
-            id: "my-monaco-editor",
-            init: "init",
-            height: "80%",
-
-        }]
-})

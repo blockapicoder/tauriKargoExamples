@@ -19,8 +19,7 @@ function loadScript(src) {
 }
 
 function ensureMonacoCss(rootNode) {
-    const target =
-        rootNode && rootNode.nodeType === 11 ? rootNode : document.head;
+    const target = rootNode && rootNode.nodeType === 11 ? rootNode : document.head;
 
     if (
         target.querySelector &&
@@ -53,7 +52,6 @@ async function loadMonaco() {
 
             return new Promise((resolve, reject) => {
                 window.require(["vs/editor/editor.main"], () => {
-
                     const ts = monaco.languages.typescript;
 
                     ts.typescriptDefaults.setEagerModelSync(true);
@@ -103,18 +101,12 @@ function languageFromPath(path) {
     return "plaintext";
 }
 
-/**
- * filesObj: { [path: string]: string }
- * entryPath (optionnel) : ce fichier sera traité en dernier
- */
 function syncProjectFiles(monaco, filesObj, entryPath) {
     const files = filesObj || {};
     const existing = monaco.editor.getModels();
 
     const allPaths = Object.keys(files);
-    const needed = new Set(
-        allPaths.map((p) => projectUri(monaco, p).toString()),
-    );
+    const needed = new Set(allPaths.map((p) => projectUri(monaco, p).toString()));
 
     // nettoyer les anciens modèles
     for (const model of existing) {
@@ -150,6 +142,36 @@ function syncProjectFiles(monaco, filesObj, entryPath) {
     }
 }
 
+/* ---------- format diagnostics (TS worker) ---------- */
+
+function flattenTsMessageText(messageText) {
+    if (typeof messageText === "string") return messageText;
+
+    // DiagnosticMessageChain
+    const parts = [];
+    let cur = messageText;
+    while (cur) {
+        if (cur.messageText) parts.push(String(cur.messageText));
+        cur = cur.next && cur.next.length ? cur.next[0] : null;
+    }
+    return parts.join(" ");
+}
+
+function formatTsDiagnostics(diags, model) {
+    if (!Array.isArray(diags) || diags.length === 0) return "";
+
+    return diags
+        .map((d) => {
+            const start = typeof d.start === "number" ? d.start : 0;
+            const pos = model.getPositionAt(start);
+            const code = d.code ? `TS${d.code}` : "";
+            const msg = flattenTsMessageText(d.messageText);
+            const loc = `L${pos.lineNumber}:${pos.column}`;
+            return [loc, code, msg].filter(Boolean).join(" ").trim();
+        })
+        .join("\n");
+}
+
 /* ---------- 1) Charger à partir d’un objet { [path]: string } ---------- */
 
 export async function loadProjectFromObject(files) {
@@ -161,8 +183,15 @@ export async function loadProjectFromObject(files) {
 
 /* ---------- 2) Init éditeur dans Shadow DOM à partir de l’objet ---------- */
 
+/**
+ * options:
+ * - files: { [path: string]: { content: string } }
+ * - entry: string
+ * - editorOptions: object
+ * - onChange?: (type: "syntaxError" | "semanticError" | "value", payload: string) => void
+ */
 export async function initMonacoFromFilesObject(host, options = {}) {
-    const { files, entry, editorOptions = {} } = options;
+    const { files, entry, editorOptions = {}, onChange } = options;
     if (!host) throw new Error("initMonacoFromFilesObject: host manquant");
     if (!files) throw new Error("initMonacoFromFilesObject: files manquant");
 
@@ -206,6 +235,7 @@ export async function initMonacoFromFilesObject(host, options = {}) {
         );
     }
 
+    // init TS worker
     try {
         const getWorker = await monaco.languages.typescript.getTypeScriptWorker();
         await getWorker(entryUri);
@@ -220,40 +250,82 @@ export async function initMonacoFromFilesObject(host, options = {}) {
         ...editorOptions,
     });
 
+    // --- Callback onChange (syntaxError -> semanticError -> value) ---
+    if (typeof onChange === "function") {
+        let timer = null;
+        let seq = 0;
+
+        const fileName = entryUri.toString(); // utilisé par le worker TS
+
+        const runValidation = async (expectedSeq, expectedVersionId) => {
+            try {
+                const getWorker = await monaco.languages.typescript.getTypeScriptWorker();
+                const worker = await getWorker(entryUri);
+
+                const synt = await worker.getSyntacticDiagnostics(fileName);
+
+                // anti-race
+                if (expectedSeq !== seq || expectedVersionId !== model.getVersionId()) return;
+
+                if (synt && synt.length) {
+                    onChange("syntaxError", formatTsDiagnostics(synt, model));
+                    return;
+                }
+
+                const sem = await worker.getSemanticDiagnostics(fileName);
+
+                if (expectedSeq !== seq || expectedVersionId !== model.getVersionId()) return;
+
+                if (sem && sem.length) {
+                    onChange("semanticError", formatTsDiagnostics(sem, model));
+                    return;
+                }
+
+                onChange("value", model.getValue());
+            } catch (e) {
+                // fallback (si worker KO) via markers monaco
+                const markers = monaco.editor.getModelMarkers({ resource: entryUri }) || [];
+                if (markers.length) {
+                    const msg = markers
+                        .map((m) => `L${m.startLineNumber}:${m.startColumn} ${m.message}`)
+                        .join("\n");
+                    onChange("semanticError", msg);
+                } else {
+                    onChange("value", model.getValue());
+                }
+            }
+        };
+
+        const scheduleValidation = () => {
+            seq += 1;
+            const mySeq = seq;
+            const myVersionId = model.getVersionId();
+
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(() => {
+                runValidation(mySeq, myVersionId);
+            }, 200);
+        };
+
+        const disposable = editor.onDidChangeModelContent(() => {
+            // optionnel mais utile : garder l'objet files en phase avec l'éditeur
+            if (filesObj[entryPath] && typeof filesObj[entryPath] === "object") {
+                filesObj[entryPath].content = model.getValue();
+            }
+            scheduleValidation();
+        });
+
+        // première émission (état initial)
+        scheduleValidation();
+
+        editor.onDidDispose(() => {
+            if (timer) clearTimeout(timer);
+            disposable.dispose();
+        });
+    }
+
     host._monacoEditor = editor;
     return { editor, monaco };
-}
-
-/* ---------- init simple ---------- */
-
-export async function initMonacoEditor(container, options = {}) {
-    if (!container) {
-        throw new Error("initMonacoEditor: container manquant");
-    }
-
-    if (container._monacoEditor) {
-        container._monacoEditor.dispose();
-        container._monacoEditor = null;
-    }
-
-    ensureMonacoCss(document);
-    const monaco = await loadMonaco();
-
-    const editor = monaco.editor.create(
-        container,
-        Object.assign(
-            {
-                value: "",
-                language: "typescript",
-                theme: "vs-dark",
-                automaticLayout: true,
-            },
-            options,
-        ),
-    );
-
-    container._monacoEditor = editor;
-    return editor;
 }
 
 export { monacoPromise };

@@ -1,6 +1,48 @@
 
-import { ImagePixels, CompressionDemande, TAILLE_DECOUPAGE, RGBA, DecoupageFeature, Trace, Result } from "./model"
-import { Ctx, distance, P, simplifier, TraceFct } from "./spec-spi"
+import { ImagePixels, CompressionDemande, TAILLE_DECOUPAGE, RGBA, DecoupageFeature, Trace, Result ,Ctx} from "./model"
+import {  distance, P,  TypeFonction ,PointFeature} from "./spec-spi"
+import {  creerFunction ,initWebGpu} from "./spi-webgpu"
+
+export type TraceFct = (nbRetrait: number, nbTest: number) => void
+
+export interface ResultSimplifier<T> {
+    result: PointFeature<T>[] 
+    nombreRetrait: number
+}
+
+
+
+export  function simplifier(type: TypeFonction, points: PointFeature<P>[], ctx: Ctx, D: (a: P, b: P) => number,trace: TraceFct): ResultSimplifier<P>  {
+    let retrait: PointFeature<P>[] = []
+    let nombreErreur = 0
+    let result: PointFeature<P>[] = [...points]
+    let nbTest = 0
+    const r: ResultSimplifier<P> = { nombreRetrait: 0, result:result }
+
+    while (nombreErreur < ctx.nombreEssai && retrait.length < ctx.nombreRetrait) {
+        let idx = Math.trunc(Math.random() * result.length);
+        nbTest++;
+        let value = result[idx]
+        let newResult = result.filter((e, i) => i !== idx)
+        let newRetrait = [...retrait, value]
+        const f = creerFunction(type, newResult, D)
+        const values = f(newRetrait.map((e)=>e.value))
+        if (values.every((y,idx) => Math.abs(y - newRetrait[idx].y) <= ctx.erreur)) {
+            result = newResult
+            retrait = newRetrait
+        } else {
+            nombreErreur++
+        }
+       trace(retrait.length, nbTest)
+    }
+    r.nombreRetrait = retrait.length
+    r.result = result
+    return r
+
+
+
+
+}
 export function getRGBA(p: ImagePixels, x: number, y: number): RGBA {
     const { width, height, data } = p;
 
@@ -51,7 +93,8 @@ function creerDecoupageFeature(imagePixels: ImagePixels, x: number, y: number) {
 
 }
 
-self.onmessage = (evt) => {
+self.onmessage = async (evt) => {
+    await initWebGpu()
     const compressionDemande: CompressionDemande = evt.data
     const ctx: Ctx = compressionDemande.ctx
     const imagePixels = compressionDemande.imagePixels
@@ -69,7 +112,7 @@ self.onmessage = (evt) => {
         if (t.nbRetrait !== nbRetrait) {
             t.nbRetrait = nbRetrait
             t.nbTest = nbTest
-            self.postMessage(t)
+         //   self.postMessage(t)
         }
     }
 

@@ -1,7 +1,8 @@
-import { CompressionDemande, Result, Trace } from "./model";
+import { CompressionDemande, Ctx, Result, Trace } from "./model";
 import { defineVue, boot } from "./node_modules/tauri-kargo-tools/src/vue"
 
-import { Ctx, distance, PointFeature, simplifier, P } from "./spec-spi";
+import {  distance, PointFeature,  P } from "./spec-spi";
+import { creerFunction, initWebGpu } from "./spi-webgpu"
 
 
 const TAILLE_DECOUPAGE = 16
@@ -98,7 +99,7 @@ class ImageCompression {
     numbreRetrait: number = 0
     titreErreur = "Erreur"
     erreur: number = 2
-    progression: string =""
+    progression: string = ""
     worker: Worker | undefined
 
     createCanvas(): HTMLElement {
@@ -107,6 +108,38 @@ class ImageCompression {
         this.canvas.height = 256;
         this.ctx = this.canvas.getContext('2d', { willReadFrequently: true })!;
         return this.canvas
+    }
+    async testWebgpu() {
+        await initWebGpu(); // optionnel
+        const points: PointFeature<P>[] = []
+        points.push({
+            value: {
+                x: 45,
+                y: 22
+            },
+            y: 12
+        })
+        points.push({
+            value: {
+                x: 10,
+                y: 2
+            },
+            y: 4
+        })
+        points.push({
+            value: {
+                x: 78,
+                y: 11
+            },
+            y: 40
+        })
+        const f = creerFunction("RDP", points, distance);
+
+        const y1 = f({ x: 10, y: 2 });                 // scalaire
+        const ys = f([{ x: 78, y: 11 }, { x: 3, y: 4 }]);
+        this.sortie = ""
+        this.sortie += `${JSON.stringify(y1)}\n`
+        this.sortie += `${JSON.stringify(ys)}\n`
     }
     async loadImageTo256(fileObj: File) {
         const url = URL.createObjectURL(fileObj);
@@ -183,9 +216,9 @@ class ImageCompression {
             if (data.type === "trace") {
                 this.sortie += `${data.p.x},${data.p.y} nbRetrait = ${data.nbRetrait} , nbTest = ${data.nbTest} ,nombreTotalRetrait = ${data.nombreTotalRetrait} \n`
             }
-            if (data.type ==="result") {
+            if (data.type === "result") {
                 this.decoupages.push(data)
-                this.sortie =""
+                this.sortie = ""
                 this.progression = `${this.decoupages.length}`
 
             }
@@ -219,7 +252,7 @@ defineVue(ImageCompression, (vue) => {
         vue.flow({ orientation: "row" }, () => {
             vue.staticButton({ action: "compresser", label: "Compresser" })
             vue.staticButton({ action: "arreter", label: "Arreter" })
-
+            vue.staticButton({ action: "testWebgpu", label: "Test webgpu" })
         })
         vue.label("progression")
         vue.label("sortie")
