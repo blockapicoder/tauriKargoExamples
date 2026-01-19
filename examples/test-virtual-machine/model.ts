@@ -1,6 +1,7 @@
 export interface Global { type: 'global', idx: number }
+export interface Extern { type: 'extern', name: string }
 export interface Local { type: 'local', idx: number }
-export type Var = Local | Global
+export type Var = Local | Global | Extern
 export type Literal = { type: "literal", value: number | string | boolean }
 export interface Call<V> {
     type: "call",
@@ -18,9 +19,9 @@ export type Expr<Var> = Var | Call<Var> | Literal | PartialCall<Var>
 export interface IfRet { type: 'ifRet', if: Expr<Var>, then: Expr<Var> }
 export interface Ret { type: 'ret', value: Expr<Var> }
 export interface SetVar { type: 'setLocal' | 'setGlobal', var: number, value: Expr<Var> }
-export interface SetVarGlobal { type: 'setGlobal', var: number, value: Expr<Global> }
+export interface SetVarGlobal { type: 'setGlobal', var: number, value: Expr<Global|Extern> }
 export interface Fun extends Code { var: number }
-export type Prog = (SetVarGlobal | Fun | Call<Global>)[]
+export type Prog = (SetVarGlobal | Fun | Call<Global|Extern>)[]
 export interface Code { type: "fun", code: (SetVar | IfRet | Call<Var>)[], ret: Expr<Var> }
 
 
@@ -28,7 +29,7 @@ export interface Code { type: "fun", code: (SetVar | IfRet | Call<Var>)[], ret: 
 
 
 
-export type Cell = (Code | Literal)
+
 // Adapte/importe tes types existants
 // type Fun, Var, Literal, Expr, Set, IfRet, Call, SetGlobal, Global, Prog, etc.
 
@@ -61,6 +62,9 @@ return ${this.generateExpr(fun.ret)}
         }
         if (v.type === "local") {
             return `locals[${v.idx}]`;
+        }
+        if (v.type ==="extern") {
+            return `prims[${JSON.stringify(v.name)}]`
         }
         return JSON.stringify(v.value);
     }

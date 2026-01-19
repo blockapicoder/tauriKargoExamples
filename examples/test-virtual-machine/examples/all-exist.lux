@@ -1,0 +1,2 @@
+setGlobal l = createArray(1,2,3,4,5);
+call print(all(l, $(e)=> e > 0 ));

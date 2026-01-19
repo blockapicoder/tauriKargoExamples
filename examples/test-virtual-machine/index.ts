@@ -4,6 +4,7 @@ import { parse } from "./parser"
 import * as cm from "./codemirror-module"
 import { defineVue, boot } from "./node_modules/tauri-kargo-tools/src/vue"
 import { TauriKargoClient, createClient } from "./node_modules/tauri-kargo-tools/src/api"
+import { compileProgram } from "./luxlang-compile"
 
 
 
@@ -77,8 +78,37 @@ class Editor {
     selections: number[] = []
     dialogCreerScript?: DialogCreerScript
     estExecutable = false
+    PRIMS: any = {}
     constructor() {
+        this.PRIMS = {
+            cr: () => {
+                this.sortie += "\n"
+            },
+            print: (s: any) => {
+                if (typeof s === "string") {
+                    this.sortie += s
+                } else {
+                    this.sortie += JSON.stringify(s)
+                }
+            },
+            clear: () => {
+                this.sortie = ""
+            },
+            cur: (f: (...values: any[]) => any, ...args: any[]) => {
+                return (...newArgs: any[]) => {
+                    const tmp: any[] = [...args, ...newArgs]
+                    return f(...tmp)
+                }
 
+            },
+            createArray: (...args: any[]) => args,
+            map: (lst: any[], f: (o: any) => any) => lst.map(f),
+            filter: (lst: any[], f: (o: any) => boolean) => lst.filter(f),
+            concat: (...args: any[][]) => args.flatMap((e) => e),
+            all: (a: any[], p: (e: any) => boolean) => { return a.every(p) },
+            exist: (a: any[], p: (e: any) => boolean) => { return a.some(p) },
+            beastNumber: 666
+        }
     }
     println(src: string) {
         this.sortie += src + "\n"
@@ -105,41 +135,16 @@ class Editor {
 
     }
     async run() {
-        const PRIMS = {
-            cr: () => {
-                this.sortie += "\n"
-            },
-            print: (s: any) => {
-                if (typeof s === "string") {
-                    this.sortie += s
-                } else {
-                    this.sortie += JSON.stringify(s)
-                }
-            },
-            clear: () => {
-                this.sortie = ""
-            },
-            cur: (f: (...values: any[]) => any, ...args: any[]) => {
-                return (...newArgs: any[]) => {
-                    const tmp: any[] = [...args, ...newArgs]
-                    return f(...tmp)
-                }
 
-            },
-            createArray: (...args: any[]) => args,
-            map: (lst: any[], f: (o: any) => any) => lst.map(f),
-            filter: (lst: any[], f: (o: any) => boolean) => lst.filter(f),
-            concat: (...args: any[][]) => args.flatMap((e) => e),
-            all: (a: any[], p: (e: any) => boolean) => { return a.every(p) },
-            exist: (a: any[], p: (e: any) => boolean) => { return a.some(p) }
-        }
-        const prog = await parse(this.codemirror.getValue())
-        console.log(JSON.stringify(prog, null, 2))
-        const js = vm.generateProg(prog)
         try {
+            const progRaw = await parse(this.codemirror.getValue())
+            const prog = compileProgram(progRaw, new Set(Object.keys(this.PRIMS)))
+            console.log(JSON.stringify(prog, null, 2))
+            const js = vm.generateProg(prog)
+
             const run = eval(js) as (prims: any) => any
 
-            run(PRIMS)
+            run(this.PRIMS)
             this.message = "Execution ✅ Succès"
         } catch (e: any) {
             this.message = e.message + " ❌ Erreur "
@@ -169,13 +174,14 @@ class Editor {
         this.codemirror = cm.CodeMirror.fromTextArea(ta, {
             lineNumbers: true,
             mode: "luxlang",
-            theme: "default",
+            theme: "dracula",
             tabSize: 2,
         });
         this.codemirror.on("change", async (instance: any, changeObj: any) => {
             const code = instance.getValue();
             try {
-                const prog = await parse(this.codemirror.getValue())
+                const progRaw = await parse(this.codemirror.getValue())
+                const prog = compileProgram(progRaw, new Set(Object.keys(this.PRIMS)))
                 this.message = "Compile ✅ Succès"
                 this.estExecutable = true
 
@@ -219,6 +225,7 @@ class Editor {
         // IMPORTANT: adapte le chemin si besoin (sinon 404)
         return Promise.all([
             ensureLink("codemirror-core", "codemirror/lib/codemirror.css"),
+            ensureLink("codemirror-theme", "codemirror/theme/dracula.css"), // <-- AJOUT
             ensureLink("codemirror-motclef", "mot-clef.css"),
         ]).then(() => undefined);
     }
