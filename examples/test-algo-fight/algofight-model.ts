@@ -21,8 +21,7 @@ export const model= schema.createModel({
         type: {union: ["Usine"]},
         position: {ref: ["Position"]},
         joueur: {optional: {ref: ["Joueur"]}},
-        technologie: {union: ["Population", "Vitesse", "Porte", "Transport", "Puissance", "Bouclier"]},
-        bouclier: "number"
+        technologie: {union: ["Population", "Vitesse", "Porte", "Transport", "Puissance", "Bouclier"]}
     },
     Position: {
         type: {union: ["Position"]},
@@ -33,4 +32,4 @@ export const model= schema.createModel({
         type: {union: ["Joueur"]},
     }
 
-} );
+} as const );

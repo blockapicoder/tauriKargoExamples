@@ -4,6 +4,143 @@ const MONACO_BASE = window.MONACO_BASE || "/node_modules/monaco-editor/min";
 const PROJECT_ROOT = "file:///";
 
 let monacoPromise = null;
+/* ---------- import path autocomplete (FS virtuel via filesObj) ---------- */
+
+const importPathCompletionState = {
+    disposable: null,
+    filesObj: null,
+};
+
+function _normPath(p) {
+    return String(p || "").replace(/^\/+/, "").replace(/\\/g, "/");
+}
+function _isCodeFile(p) {
+    return /\.(tsx?|jsx?)$/.test(p);
+}
+function _stripExt(p) {
+    return p.replace(/\.(tsx?|jsx?)$/, "");
+}
+function _dirname(p) {
+    p = _normPath(p);
+    const i = p.lastIndexOf("/");
+    return i >= 0 ? p.slice(0, i) : "";
+}
+function _relativePath(fromDir, toPath) {
+    fromDir = _normPath(fromDir);
+    toPath = _normPath(toPath);
+
+    const from = fromDir ? fromDir.split("/") : [];
+    const to = toPath.split("/");
+
+    let i = 0;
+    while (i < from.length && i < to.length && from[i] === to[i]) i++;
+
+    const upCount = from.length - i;
+    const down = to.slice(i);
+
+    const parts = [];
+    for (let k = 0; k < upCount; k++) parts.push("..");
+    parts.push(...down);
+
+    let rel = parts.join("/");
+    if (!rel) rel = ".";
+    if (!rel.startsWith(".")) rel = "./" + rel;
+    return rel;
+}
+
+function _toModuleSpecifier(fromFile, toFile) {
+    const fromDir = _dirname(fromFile);
+
+    // cible sans extension + "index" compacté
+    let target = _stripExt(_normPath(toFile));
+    if (target.endsWith("/index")) target = target.slice(0, -"/index".length) || ".";
+
+    const rel = _relativePath(fromDir, target);
+    return rel === "." ? "./" : rel;
+}
+
+function _toRootSpecifier(toFile) {
+    let target = _stripExt(_normPath(toFile));
+    if (target.endsWith("/index")) target = target.slice(0, -"/index".length);
+    return target;
+}
+
+function enableImportPathAutocomplete(monaco, filesObj) {
+    importPathCompletionState.filesObj = filesObj || {};
+
+    if (importPathCompletionState.disposable) return;
+
+    importPathCompletionState.disposable =
+        monaco.languages.registerCompletionItemProvider("typescript", {
+            triggerCharacters: ["'", '"', "/", "."],
+            provideCompletionItems: (model, position) => {
+                const files = importPathCompletionState.filesObj || {};
+                const lineNumber = position.lineNumber;
+                const line = model.getLineContent(lineNumber);
+
+                // Monaco: position.column est 1-based
+                const upto = line.slice(0, position.column - 1);
+
+                // On ne déclenche que si on est dans:
+                //   import ... from '...|
+                //   export ... from '...|
+                //   import('...|
+                //   require('...|
+                const m = upto.match(
+                    /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)['"]([^'"]*)$/
+                );
+                if (!m) return { suggestions: [] };
+
+                const typed = m[1] || "";
+                const startIndex = upto.length - typed.length; // 0-based index du début du fragment tapé
+
+                const range = new monaco.Range(
+                    lineNumber,
+                    startIndex + 1,          // -> 1-based
+                    lineNumber,
+                    position.column
+                );
+
+                const currentPath = _normPath(model.uri.path); // ex: "/src/a.ts" -> "src/a.ts"
+
+                const suggestionsSet = new Set();
+
+                for (const p of Object.keys(files)) {
+                    const fp = _normPath(p);
+                    if (!_isCodeFile(fp)) continue;
+                    if (fp === currentPath) continue;
+
+                    // Si l’utilisateur tape un relatif ("." / ".."), on ne propose que du relatif.
+                    // Sinon, on propose root + relatif (pratique quand on veut des imports type "src/...")
+                    const relSpec = _toModuleSpecifier(currentPath, fp);
+                    const rootSpec = _toRootSpecifier(fp);
+
+                    const candidates = typed.startsWith(".")
+                        ? [relSpec]
+                        : [rootSpec, relSpec];
+
+                    for (const spec of candidates) {
+                        if (!spec) continue;
+                        if (!spec.startsWith(typed)) continue;
+                        if (spec.startsWith(".")) {
+                            suggestionsSet.add(spec);
+                        }
+                    }
+                }
+
+                const suggestions = Array.from(suggestionsSet)
+                    .sort((a, b) => a.localeCompare(b))
+                    .map((spec) => ({
+                        label: spec,
+                        kind: monaco.languages.CompletionItemKind.File,
+                        insertText: spec,
+                        range,
+                    }));
+
+                return { suggestions };
+            },
+        });
+}
 
 /* ---------- utils scripts + CSS ---------- */
 
@@ -221,6 +358,7 @@ export async function initMonacoFromFilesObject(host, options = {}) {
 
     // ⚙️ sync avec entry en dernier
     syncProjectFiles(monaco, filesObj, entryPath);
+    enableImportPathAutocomplete(monaco, filesObj);
 
     const entryUri = projectUri(monaco, entryPath);
     let model = monaco.editor.getModel(entryUri);

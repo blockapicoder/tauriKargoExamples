@@ -29,7 +29,7 @@ defineVue(RobotTypescriptFile, {
     orientation: "row",
     gap: 10,
     children: [
-        { kind:"label" , name:"nom", width:"10%"},
+        { kind: "label", name: "nom", width: "10%" },
         { kind: "label", name: "repertoire", width: '80%' },
 
         { kind: "staticBootVue", label: "Editer", factory: "ouvrirMonacoEditor", width: '10%' }
@@ -94,7 +94,7 @@ export class RobotExplorateur {
     }
 
     ajouterRobot(): Explorateur {
-        const r=  new Explorateur()
+        const r = new Explorateur()
         r.robotExplorateur = this
         return r
 
@@ -102,8 +102,8 @@ export class RobotExplorateur {
 }
 defineVue(RobotExplorateur, (vue) => {
 
-    vue.flow({ orientation: "column" ,gap:10}, () => {
-        vue.flow({ orientation: "row" ,gap:10}, () => {
+    vue.flow({ orientation: "column", gap: 10 }, () => {
+        vue.flow({ orientation: "row", gap: 10 }, () => {
             vue.staticButton({ action: "executer", label: "Executer", width: "50%" })
             vue.staticBootVue({ factory: "ajouterRobot", label: "Ajouter robot", width: "50%" })
         })
@@ -121,7 +121,7 @@ defineVue(RobotExplorateur, (vue) => {
 
     })
 
-},{ init:"init"})
+}, { init: "init" })
 export interface Content {
     path: string, content?: string
 
@@ -149,23 +149,39 @@ class MonacoEditor {
         return this.div
     }
     async init() {
-    
+
+
+
+        //const tauriKargoToolsFiles = await this.explorateur.tauriKargoClient.explorer({ type:"array" , path:`${config.code}/node_modules/tauri-kargo-tools`})
+        await this.explorateur.tauriKargoClient.setCurrentDirectory({ path: this.repertoire })
+        this.source = await this.explorateur.tauriKargoClient.readFileText("robot.ts")
+        const ctx = await buildLightContext({
+            "robot.ts": {
+                path: "./robot.ts",
+                content: this.source
+            }
+        }, "robot.ts")
+        const config = await this.explorateur.tauriKargoClient.getConfig()
+        await this.explorateur.tauriKargoClient.setCurrentDirectory({ path: config.code })
+        const files: string[] = [
+            "node_modules/tauri-kargo-tools/src/schema/base.ts",
+            "node_modules/tauri-kargo-tools/src/schema/client.ts",
+            "algofight-model.ts"]
+        for (const file of files) {
+            const sourceBase = await this.explorateur.tauriKargoClient.readFileText(file)
+            ctx[file] = { path: `./${file}`, content: sourceBase }
+        }
         await this.explorateur.tauriKargoClient.setCurrentDirectory({ path: this.repertoire })
 
-     
-        this.source = await this.explorateur.tauriKargoClient.readFileText("robot.ts")
-        const ctx = await buildLightContext( { "robot.ts":{
-            path:"./robot.ts",
-            content:this.source
-        } }, "robot.ts")
 
         const editor = await initMonacoFromFilesObject(this.div, {
             files: ctx,
-            entry:  "robot.ts",
+            entry: "robot.ts",
             language: "typescript",
-            onChange:async ( type:MonacoChangeType , payload:string) => {
-                if (type ==="value") {
-                    await this.explorateur.tauriKargoClient.writeFileText("robot.ts",payload)
+            onChange: async (type: MonacoChangeType, payload: string) => {
+                if (type === "value") {
+
+                    await this.explorateur.tauriKargoClient.writeFileText("robot.ts", payload)
                 }
             }
         });

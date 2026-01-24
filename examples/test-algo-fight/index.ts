@@ -1,4 +1,6 @@
-import { Explorateur} from './explorateur'
+import { Explorateur } from './explorateur'
 import { boot } from "./node_modules/tauri-kargo-tools/src/vue"
 import { RobotExplorateur } from './robot-explorateur'
-boot(new RobotExplorateur() )
+import { WorkerTest } from './worker-ui-test'
+boot(new RobotExplorateur())
+//boot(new WorkerTest())
