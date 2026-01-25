@@ -5,11 +5,13 @@ import { initMonacoFromFilesObject } from "./monaco"
 import { buildLightContext } from "./context"
 import { Robot } from "./model"
 import { Explorateur } from "./explorateur"
+import { Monde } from "./monde"
 
 
 
 
-class RobotTypescriptFile implements Robot {
+export class RobotTypescriptFile implements Robot {
+    selected = false
     nom: string = ""
     repertoire: string = ""
     explorateur!: RobotExplorateur
@@ -21,7 +23,16 @@ class RobotTypescriptFile implements Robot {
         r.explorateur = this.explorateur
 
 
+
         return r;
+    }
+    updateSelected() {
+        this.explorateur.initPeutCombattre()
+    }
+    async getSource() {
+        await this.explorateur.tauriKargoClient.setCurrentDirectory({ path: this.repertoire })
+        return this.explorateur.tauriKargoClient.readFileText("robot.ts")
+
     }
 }
 defineVue(RobotTypescriptFile, {
@@ -29,6 +40,7 @@ defineVue(RobotTypescriptFile, {
     orientation: "row",
     gap: 10,
     children: [
+        { kind: "input", name: "selected", inputType: "checkbox", update: "updateSelected" },
         { kind: "label", name: "nom", width: "10%" },
         { kind: "label", name: "repertoire", width: '80%' },
 
@@ -42,12 +54,16 @@ interface ExplorateurTypescriptContext {
 export class RobotExplorateur {
     robots: RobotTypescriptFile[] = []
     tauriKargoClient!: TauriKargoClient
+    peutCombattre = false
 
 
     constructor() {
         this.tauriKargoClient = createClient();
 
 
+    }
+    initPeutCombattre() {
+        this.peutCombattre = this.robots.filter((r) => r.selected).length === 2
     }
     async init(div: HTMLDivElement) {
         await this.tauriKargoClient.setCurrentDirectory({ path: "." })
@@ -89,8 +105,11 @@ export class RobotExplorateur {
         }
         return contexte
     }
-    async executer() {
-
+    creerMonde() {
+        const r = new Monde()
+        r.robot1 = this.robots[0]
+        r.robot2 = this.robots[1]
+        return r;
     }
 
     ajouterRobot(): Explorateur {
@@ -104,7 +123,7 @@ defineVue(RobotExplorateur, (vue) => {
 
     vue.flow({ orientation: "column", gap: 10 }, () => {
         vue.flow({ orientation: "row", gap: 10 }, () => {
-            vue.staticButton({ action: "executer", label: "Executer", width: "50%" })
+            vue.staticBootVue({ factory: "creerMonde", label: "Combattre", width: "50%" })
             vue.staticBootVue({ factory: "ajouterRobot", label: "Ajouter robot", width: "50%" })
         })
         vue.listOfVue({
@@ -169,7 +188,7 @@ class MonacoEditor {
             "algofight-model.ts"]
         for (const file of files) {
             const sourceBase = await this.explorateur.tauriKargoClient.readFileText(file)
-            ctx[file] = { path: `./${file}`, content: sourceBase }
+            ctx[file] = { path: `/${file}`, content: sourceBase }
         }
         await this.explorateur.tauriKargoClient.setCurrentDirectory({ path: this.repertoire })
 
