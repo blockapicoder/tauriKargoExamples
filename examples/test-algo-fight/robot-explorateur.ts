@@ -31,6 +31,16 @@ export class RobotTypescriptFile implements Robot {
     }
     async getSource() {
         await this.explorateur.tauriKargoClient.setCurrentDirectory({ path: this.repertoire })
+        const rep = await this.explorateur.tauriKargoClient.explorer({})
+        if (rep.type === "directory") {
+
+            const c = rep.path +"\\"+ this.nom + "\\robot.ts"
+
+            const ast = await this.explorateur.tauriKargoClient.typescriptAst({ path: c})
+            if (ast.ok) {
+                debugger
+            }
+        }
         return this.explorateur.tauriKargoClient.readFileText("robot.ts")
 
     }
