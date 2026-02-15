@@ -2,7 +2,7 @@ import { CompressionDemande, Ctx, Result, Trace } from "./model";
 import { defineVue, boot } from "./node_modules/tauri-kargo-tools/src/vue"
 
 import {  distance, PointFeature,  P } from "./spec-spi";
-import { creerFunction, initWebGpu } from "./spi-webgpu"
+
 
 
 const TAILLE_DECOUPAGE = 16
@@ -109,38 +109,7 @@ class ImageCompression {
         this.ctx = this.canvas.getContext('2d', { willReadFrequently: true })!;
         return this.canvas
     }
-    async testWebgpu() {
-        await initWebGpu(); // optionnel
-        const points: PointFeature<P>[] = []
-        points.push({
-            value: {
-                x: 45,
-                y: 22
-            },
-            y: 12
-        })
-        points.push({
-            value: {
-                x: 10,
-                y: 2
-            },
-            y: 4
-        })
-        points.push({
-            value: {
-                x: 78,
-                y: 11
-            },
-            y: 40
-        })
-        const f = creerFunction("RDP", points, distance);
 
-        const y1 = f({ x: 10, y: 2 });                 // scalaire
-        const ys = f([{ x: 78, y: 11 }, { x: 3, y: 4 }]);
-        this.sortie = ""
-        this.sortie += `${JSON.stringify(y1)}\n`
-        this.sortie += `${JSON.stringify(ys)}\n`
-    }
     async loadImageTo256(fileObj: File) {
         const url = URL.createObjectURL(fileObj);
         try {
@@ -252,7 +221,7 @@ defineVue(ImageCompression, (vue) => {
         vue.flow({ orientation: "row" }, () => {
             vue.staticButton({ action: "compresser", label: "Compresser" })
             vue.staticButton({ action: "arreter", label: "Arreter" })
-            vue.staticButton({ action: "testWebgpu", label: "Test webgpu" })
+  
         })
         vue.label("progression")
         vue.label("sortie")

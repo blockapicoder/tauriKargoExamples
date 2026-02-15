@@ -6,8 +6,33 @@ import { buildLightContext } from "./context"
 import { Robot } from "./model"
 import { Explorateur } from "./explorateur"
 import { Monde } from "./monde"
+import { AstNode } from "./node_modules/tauri-kargo-tools/src/types"
+const ORIGIN = new URL(import.meta.url).origin;      // https://example.com
+const BASE = new URL(".", import.meta.url).href;
+function findAstNode(astNode: AstNode, path: string[], idx: number = 0): AstNode[] {
+    const r: AstNode[] = []
+    if (idx === path.length) {
+        return [astNode]
+    }
+    for (const node of astNode.children) {
+        if (node.kind === path[idx]) {
+            r.push(...findAstNode(node, path, idx + 1))
+        }
+    }
+    return r
 
 
+}
+export function replaceRange(text: string, start: number, end: number, s: string): string {
+    // Normalisation + garde-fous
+    const n = text.length;
+    const a = Math.max(0, Math.min(n, start));
+    const b = Math.max(0, Math.min(n, end));
+    const from = Math.min(a, b);
+    const to = Math.max(a, b);
+
+    return text.slice(0, from) + s + text.slice(to);
+}
 
 
 export class RobotTypescriptFile implements Robot {
@@ -32,16 +57,32 @@ export class RobotTypescriptFile implements Robot {
     async getSource() {
         await this.explorateur.tauriKargoClient.setCurrentDirectory({ path: this.repertoire })
         const rep = await this.explorateur.tauriKargoClient.explorer({})
+        let source = await this.explorateur.tauriKargoClient.readFileText("robot.ts")
         if (rep.type === "directory") {
-
-            const c = rep.path +"\\"+ this.nom + "\\robot.ts"
-
-            const ast = await this.explorateur.tauriKargoClient.typescriptAst({ path: c})
+            const c = rep.path + "\\" + this.nom + "\\robot.ts"
+            const ast = await this.explorateur.tauriKargoClient.typescriptAst({ path: c })
             if (ast.ok) {
-                debugger
+                const nodes = findAstNode(ast.ast, ["ImportDecl", "Str"])
+                let deltat = 0
+                for (const node of nodes) {
+                    const p = (source).substring(node.start + deltat, node.end + deltat)
+                    const ls = ["'", '"']
+                    for (const sep of ls) {
+                        if (p.startsWith(`${sep}./`)) {
+                            const np = `${sep}${BASE}${p.substring(3)}`
+                            source = replaceRange(source, node.start + deltat, node.end + deltat, np)
+                            deltat = deltat + (np.length - p.length)
+                        }
+                    }
+
+
+                }
+
+
             }
         }
-        return this.explorateur.tauriKargoClient.readFileText("robot.ts")
+        // console.log(source)
+        return source
 
     }
 }

@@ -1,8 +1,10 @@
+import { AnimationTrajectoire } from "./animation-trajectoire";
 import { boot, defineVue } from "./node_modules/tauri-kargo-tools/src/vue"
 import { PlacerPointsPourPlanete } from "./planete";
 import { Montagne } from "./three-montagne";
 import { Planete } from "./three-planete";
 import { PlaneteNavigation } from "./three-planete-navigation";
+import { PlacerPointsPourTrajectoire } from "./trajectoire";
 
 // rayon visuel du point 2D
 
@@ -276,6 +278,74 @@ defineVue(MontagneEditeur, {
         }
     ]
 })
+export class TrajectoireAnimateur {
+    titrePagePrincipal = "Page principal"
+    animationTrajectoire!: AnimationTrajectoire
+    constructor() {
+        this.animationTrajectoire = new AnimationTrajectoire()
+    }
+    pagePrincipal() {
+        return new PagePrincpal()
+    }
+
+
+}
+defineVue(TrajectoireAnimateur, {
+    kind: "flow",
+    orientation: "column",
+    children: [
+        { kind: "bootVue", factory: "pagePrincipal", label: "titrePagePrincipal", width: "100%" },
+        {
+            kind: "flow",
+            orientation: "row",
+            children: [
+                {
+                    kind: "singleVue",
+                    name: "animationTrajectoire"
+                }
+
+
+            ]
+        }
+
+
+
+    ]
+})
+export class TrajectoireEditeur {
+    titrePagePrincipal = "Page principal"
+    placerPointsPourTrajectoire!: PlacerPointsPourTrajectoire
+    constructor() {
+        this.placerPointsPourTrajectoire = new PlacerPointsPourTrajectoire()
+    }
+    pagePrincipal() {
+        return new PagePrincpal()
+    }
+
+
+}
+defineVue(TrajectoireEditeur, {
+    kind: "flow",
+    orientation: "column",
+    children: [
+        { kind: "bootVue", factory: "pagePrincipal", label: "titrePagePrincipal", width: "100%" },
+        {
+            kind: "flow",
+            orientation: "row",
+            children: [
+                {
+                    kind: "singleVue",
+                    name: "placerPointsPourTrajectoire"
+                }
+
+
+            ]
+        }
+
+
+
+    ]
+})
 export class PlaneteEditeur {
     titrePagePrincipal = "Page principal"
     placerPointsPourPlanete!: PlacerPointsPourPlanete
@@ -320,11 +390,19 @@ export class PagePrincpal {
     titreMontagneEditeur = "Montagne editeur"
     titrePlaneteEditeur = "Planete editeur"
     titrePlaneteNavigation = "Planete navigation"
+    titreTrajectoireEditeur = "Trajectoire editeur"
+    titreTrajectoireAnimateur ="Trajectoire animateur"
     montagneEditeur() {
         return new MontagneEditeur()
     }
     planeteEditeur() {
         return new PlaneteEditeur()
+    }
+    trajectoireEditeur() {
+        return new TrajectoireEditeur()
+    }
+    trajectoireAnimateur() {
+        return new TrajectoireAnimateur()
     }
     planeteNavigation() {
         const r = new PlaneteNavigation()
@@ -339,10 +417,13 @@ export class PagePrincpal {
 defineVue(PagePrincpal, {
     kind: "flow",
     orientation: "row",
+    gap: 10,
     children: [
-        { kind: "bootVue", factory: "montagneEditeur", label: "titreMontagneEditeur", width: "33%" },
-        { kind: "bootVue", factory: "planeteEditeur", label: "titrePlaneteEditeur", width: "33%" },
-        { kind: "bootVue", factory: "planeteNavigation", label: "titrePlaneteNavigation", width: "33%" },
+        { kind: "bootVue", factory: "montagneEditeur", label: "titreMontagneEditeur", width: "20%" },
+        { kind: "bootVue", factory: "planeteEditeur", label: "titrePlaneteEditeur", width: "20%" },
+        { kind: "bootVue", factory: "planeteNavigation", label: "titrePlaneteNavigation", width: "20%" },
+        { kind: "bootVue", factory: "trajectoireEditeur", label: "titreTrajectoireEditeur", width: "20%" },
+        { kind: "bootVue", factory: "trajectoireAnimateur", label: "titreTrajectoireAnimateur", width: "20%" },
     ]
 })
 boot(new PagePrincpal())

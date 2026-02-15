@@ -1,0 +1,26 @@
+fun p(x,y);
+if x >  y ret true;
+ret false;
+
+fun f(x,y);
+ret x*y;
+
+  fun fact(n); 
+  if n==0 ret 1;
+  ret n * fact(n-1);
+  
+fun main();
+  call clear();
+
+  setGlobal R = fact(4);
+  call print(R);
+
+setGlobal l=concat(createArray(1,2),createArray(-3,4));
+call print(l);
+
+call cr();
+call print(filter(l,cur(p,2)));
+
+call cr();
+call print(map(l,cur(f,2)));
+ret 1;

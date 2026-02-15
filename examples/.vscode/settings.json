@@ -4,5 +4,8 @@
         "comments": "off",
         "strings": "off",
         "other": "off"
+    },
+    "github.copilot.enable": {
+        "*": false
     }
 }

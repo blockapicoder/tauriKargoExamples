@@ -1,0 +1,4 @@
+fun main();
+setGlobal l = [1,2,3,4,5];
+call print(all(l, $(e)=> e > 0 ));
+ret 1;

@@ -10,12 +10,12 @@ export interface MondeContexte {
 }
 
 let mondeContexte: MondeContexte | undefined = undefined
-
+const dataModel = new DataModelServer(model, "Joueur")
 
 export class Monde {
     robot1!: RobotTypescriptFile
     robot2!: RobotTypescriptFile
-    dataModel!: DataModelServer<typeof model>
+
     sortie = ""
     client!: TauriKargoClient
 
@@ -24,7 +24,7 @@ export class Monde {
     }
 
     async init(div: HTMLDivElement) {
-        this.dataModel = new DataModelServer(model)
+
         if (mondeContexte) {
             mondeContexte.workerA.terminate()
             mondeContexte.workerB.terminate()
@@ -38,13 +38,15 @@ export class Monde {
                 workerA: runWorker(javascriptSourceRobot1.src),
                 workerB: runWorker(javascriptSourceRobot2.src)
             }
-            const joueurA = this.dataModel.createValue("Joueur", { type: "Joueur" });
-            const joueurB = this.dataModel.createValue("Joueur", { type: "Joueur" })
-            this.dataModel.process(mondeContexte.workerA, (action) => {
+            const joueurA = dataModel.createValue("Joueur", { type: "Joueur" });
+            const joueurB = dataModel.createValue("Joueur", { type: "Joueur" });
+            const usine = dataModel.createValue("Usine", { position: { x: 10, y: 88 }, technologie: "Bouclier", type: "Usine" })
+            const drone = dataModel.createValue("Drone", { joueur: joueurA, position: { x: 10, y: 11 }, type: "Drone", usine: usine })
+            dataModel.process(mondeContexte.workerA, (action) => {
                 this.sortie += JSON.stringify(action, null, 2)
                 return false
             }, joueurA)
-            this.dataModel.process(mondeContexte.workerB, (action) => {
+            dataModel.process(mondeContexte.workerB, (action) => {
                 this.sortie += JSON.stringify(action, null, 2)
                 return false
             }, joueurB)
@@ -59,4 +61,4 @@ defineVue(Monde, (vue) => {
         vue.label("sortie")
 
     })
-},{ init:"init"})
+}, { init: "init" })
