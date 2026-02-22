@@ -1,0 +1,57 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Canvas Carre Allé-Retour</title>
+  <style>
+    body { margin: 0; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+
+<canvas id="myCanvas" width="500" height="300"></canvas>
+
+<script>
+  const canvas = document.getElementById("myCanvas");
+  const ctx = canvas.getContext("2d");
+
+  // Carré
+  const squareSize = 50;
+  let x = canvas.width / 4; 
+  let y = canvas.height / 2;
+  let angle = 0;
+  let direction = 1; // 1 pour droite, -1 pour gauche
+
+  function drawSquare() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    x += direction * 2; // Déplacement dans la direction actuelle
+
+    // Rebondissement aux limites de l'écran
+    if (x + squareSize > canvas.width || x < 0) {
+      direction *= -1; // Inverser la direction
+    }
+
+    ctx.save(); 
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.fillStyle = "blue";
+    ctx.fillRect(-squareSize / 2, -squareSize / 2, squareSize, squareSize);
+    ctx.restore();
+  }
+
+  function animate() {
+    angle += 0.01;
+    drawSquare();
+    requestAnimationFrame(animate);
+  }
+
+  animate(); 
+</script>
+
+</body>
+</html>
+
+
+

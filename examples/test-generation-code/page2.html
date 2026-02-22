@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Éditeur JSON récursif (Value | Logic)</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    body { margin: 0; padding: 16px; background: #0b0c10; color: #eaeaea; }
+    h1 { margin: 0 0 12px; font-size: 18px; font-weight: 650; }
+    .grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 12px; align-items: start; }
+    .panel { background: #12141a; border: 1px solid #242838; border-radius: 12px; padding: 12px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    select, input, button, textarea {
+      background: #0f1117; color: #eaeaea; border: 1px solid #2a3043;
+      border-radius: 10px; padding: 8px 10px; font-size: 14px;
+    }
+    button { cursor: pointer; }
+    button:hover { border-color: #3a4564; }
+    .muted { color: #b7bccb; font-size: 12px; }
+    .node {
+      border: 1px solid #262b3c; border-radius: 12px; padding: 10px; margin: 10px 0;
+      background: #0f1117;
+    }
+    .nodeHead { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+    .children { margin-top: 10px; padding-left: 10px; border-left: 2px solid #22283a; }
+    .childRow { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+    .pill { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid #2a3043; color: #b7bccb; }
+    pre { margin: 0; overflow: auto; max-height: 70vh; padding: 10px; background: #0b0c10; border-radius: 10px; border: 1px solid #242838; }
+    .btnDanger { border-color: #5a2b2b; }
+    .btnDanger:hover { border-color: #8a3a3a; }
+    .btnSmall { padding: 6px 8px; border-radius: 10px; font-size: 12px; }
+    .topActions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+    textarea { width: 100%; min-height: 90px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+  </style>
+</head>
+<body>
+  <h1>Éditeur récursif pour générer un JSON</h1>
+  <div class="grid">
+    <div class="panel">
+      <div class="muted">
+        Types:
+        <span class="pill">Value</span> = <code>{ type:'value', value:string }</code> —
+        <span class="pill">Logic</span> = <code>{ type:'and'|'or', values:Elt[] }</code>
+      </div>
+
+      <div id="app"></div>
+
+      <div class="topActions">
+        <button id="btnCopy">Copier le JSON</button>
+        <button id="btnReset" class="btnDanger">Reset</button>
+      </div>
+
+      <hr style="border:0;border-top:1px solid #242838;margin:12px 0" />
+
+      <div class="muted" style="margin-bottom:6px">Importer (collez un JSON compatible puis “Charger”):</div>
+      <textarea id="importArea" placeholder='{"type":"and","values":[{"type":"value","value":"x"}]}'></textarea>
+      <div class="topActions">
+        <button id="btnLoad">Charger</button>
+      </div>
+      <div id="importError" class="muted" style="color:#ffb3b3; margin-top:6px;"></div>
+    </div>
+
+    <div class="panel">
+      <div class="row" style="justify-content: space-between;">
+        <div style="font-weight:650">JSON généré</div>
+        <span class="pill" id="validPill">valide</span>
+      </div>
+      <div class="muted" style="margin:6px 0 10px;">
+        Mise à jour en temps réel (indentation 2).
+      </div>
+      <pre id="jsonOut"></pre>
+    </div>
+  </div>
+
+<script>
+(function(){
+  // ----- Types (documentation) -----
+  // interface Value { type:'value'; value:string }
+  // interface Logic { type:'and'|'or'; values:Elt[] }
+  // type Elt = Value | Logic
+
+  // ----- Model -----
+  let nextId = 1;
+  function mkValue(value = "") {
+    return { _id: nextId++, type: "value", value };
+  }
+  function mkLogic(type = "and") {
+    return { _id: nextId++, type, values: [mkValue("")] };
+  }
+
+  // Root node
+  let root = mkLogic("and");
+
+  // ----- Helpers -----
+  function isObj(x){ return x && typeof x === "object" && !Array.isArray(x); }
+
+  function sanitizeFromJson(x){
+    // Convert a plain JSON object into our internal model with _id fields.
+    if (!isObj(x) || typeof x.type !== "string") throw new Error("Objet invalide (type manquant).");
+
+    if (x.type === "value") {
+      if (typeof x.value !== "string") throw new Error("Value.value doit être une string.");
+      return { _id: nextId++, type: "value", value: x.value };
+    }
+
+    if (x.type === "and" || x.type === "or") {
+      if (!Array.isArray(x.values)) throw new Error("Logic.values doit être un tableau.");
+      return { _id: nextId++, type: x.type, values: x.values.map(sanitizeFromJson) };
+    }
+
+    throw new Error("type doit être 'value', 'and' ou 'or'.");
+  }
+
+  function toPlainJson(node){
+    if (node.type === "value") return { type: "value", value: node.value ?? "" };
+    return { type: node.type, values: (node.values ?? []).map(toPlainJson) };
+  }
+
+  function validate(node){
+    if (!node || typeof node !== "object") return false;
+    if (node.type === "value") return typeof node.value === "string";
+    if (node.type === "and" || node.type === "or") {
+      return Array.isArray(node.values) && node.values.every(validate);
+    }
+    return false;
+  }
+
+  // ----- Rendering -----
+  const app = document.getElementById("app");
+  const jsonOut = document.getElementById("jsonOut");
+  const validPill = document.getElementById("validPill");
+
+  function render(){
+    app.innerHTML = "";
+    app.appendChild(renderNode(root, null));
+    refreshJson();
+  }
+
+  function renderNode(node, parent){
+    const box = document.createElement("div");
+    box.className = "node";
+
+    const head = document.createElement("div");
+    head.className = "nodeHead";
+
+    const left = document.createElement("div");
+    left.className = "row";
+
+    const typeSel = document.createElement("select");
+    // Combo avec 3 choix : value, or, and
+    [["value","value"],["or","or"],["and","and"]].forEach(([v, label])=>{
+      const opt = document.createElement("option");
+      opt.value = v;
+      opt.textContent = label;
+      typeSel.appendChild(opt);
+    });
+    typeSel.value = node.type;
+
+    typeSel.addEventListener("change", () => {
+      const newType = typeSel.value;
+      if (newType === "value") {
+        // transform into Value
+        node.type = "value";
+        delete node.values;
+        node.value = node.value ?? "";
+      } else {
+        // transform into Logic
+        node.type = newType; // 'and' | 'or'
+        delete node.value;
+        node.values = Array.isArray(node.values) ? node.values : [mkValue("")];
+      }
+      render();
+    });
+
+    left.appendChild(typeSel);
+
+    // Value input or Logic add button
+    if (node.type === "value") {
+      const inp = document.createElement("input");
+      inp.type = "text";
+      inp.placeholder = "value (string)";
+      inp.value = node.value ?? "";
+      inp.style.minWidth = "240px";
+      inp.addEventListener("input", () => {
+        node.value = inp.value;
+        refreshJson();
+      });
+      left.appendChild(inp);
+    } else {
+      const addBtn = document.createElement("button");
+      addBtn.textContent = "Ajouter";
+      addBtn.addEventListener("click", () => {
+        node.values.push(mkValue(""));
+        render();
+      });
+      left.appendChild(addBtn);
+
+      const count = document.createElement("span");
+      count.className = "pill";
+      count.textContent = `${node.values.length} élément(s)`;
+      left.appendChild(count);
+    }
+
+    const right = document.createElement("div");
+    right.className = "row";
+
+    const idPill = document.createElement("span");
+    idPill.className = "pill";
+    idPill.textContent = `#${node._id}`;
+    right.appendChild(idPill);
+
+    if (parent) {
+      const delBtn = document.createElement("button");
+      delBtn.className = "btnSmall btnDanger";
+      delBtn.textContent = "Supprimer";
+      delBtn.addEventListener("click", () => {
+        const idx = parent.values.findIndex(x => x._id === node._id);
+        if (idx >= 0) parent.values.splice(idx, 1);
+        // évite un Logic vide: on remet un enfant par défaut
+        if ((parent.type === "and" || parent.type === "or") && parent.values.length === 0) {
+          parent.values.push(mkValue(""));
+        }
+        render();
+      });
+      right.appendChild(delBtn);
+    }
+
+    head.appendChild(left);
+    head.appendChild(right);
+    box.appendChild(head);
+
+    // Children (recursive)
+    if (node.type === "and" || node.type === "or") {
+      const children = document.createElement("div");
+      children.className = "children";
+      node.values.forEach(child => {
+        children.appendChild(renderNode(child, node));
+      });
+      box.appendChild(children);
+    }
+
+    return box;
+  }
+
+  function refreshJson(){
+    const plain = toPlainJson(root);
+    const ok = validate(plain);
+    validPill.textContent = ok ? "valide" : "invalide";
+    validPill.style.borderColor = ok ? "#2a3043" : "#8a3a3a";
+    validPill.style.color = ok ? "#b7bccb" : "#ffb3b3";
+    jsonOut.textContent = JSON.stringify(plain, null, 2);
+  }
+
+  // ----- Actions -----
+  document.getElementById("btnCopy").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(jsonOut.textContent);
+    } catch {
+      // fallback
+      const ta = document.createElement("textarea");
+      ta.value = jsonOut.textContent;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+  });
+
+  document.getElementById("btnReset").addEventListener("click", () => {
+    nextId = 1;
+    root = mkLogic("and");
+    render();
+  });
+
+  document.getElementById("btnLoad").addEventListener("click", () => {
+    const err = document.getElementById("importError");
+    err.textContent = "";
+    try {
+      const raw = JSON.parse(document.getElementById("importArea").value || "null");
+      nextId = 1;
+      root = sanitizeFromJson(raw);
+      render();
+    } catch (e) {
+      err.textContent = String(e && e.message ? e.message : e);
+    }
+  });
+
+  // init
+  render();
+})();
+</script>
+</body>
+</html>

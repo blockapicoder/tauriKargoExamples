@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Data Builder</title>
+  <style>
+    /* Basic styling for the tree view */
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+    li {
+      margin-bottom: 5px;
+    }
+    .node {
+      display: flex;
+      align-items: center;
+    }
+    .node span {
+      margin-right: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Data Builder</h1>
+
+  <h2>Value</h2>
+  <div>
+    <label for="valueType">Type:</label>
+    <input type="text" id="valueType" value="value" readonly>
+
+    <label for="valueString">Value:</label>
+    <input type="text" id="valueString">
+  </div>
+  <button onclick="addValue()">Add Value</button>
+
+  <h2>Logic</h2>
+  <div>
+    <label for="logicType">Type:</label>
+    <select id="logicType">
+      <option value="and">And</option>
+      <option value="or">Or</option>
+    </select>
+
+    <button onclick="addLogic()">Add Logic</button>
+  </div>
+
+  <h2>Data Structure</h2>
+  <ul id="dataStructure"></ul>
+
+  <script>
+    let data = [];
+
+    function addValue() {
+      const valueType = document.getElementById('valueType').value;
+      const valueString = document.getElementById('valueString').value;
+      data.push({ type: valueType, value: valueString });
+      updateStructure();
+    }
+
+    function addLogic() {
+      const logicType = document.getElementById('logicType').value;
+      data.push({ type: logicType, values: [] });
+      updateStructure();
+    }
+
+    function updateStructure() {
+      document.getElementById('dataStructure').innerHTML = ''; // Clear previous structure
+      renderTree(data, 0);
+    }
+
+    function renderTree(items, indent) {
+      const ul = document.createElement('ul');
+      for (const item of items) {
+        const li = document.createElement('li');
+        const nodeDiv = document.createElement('div');
+        nodeDiv.classList.add('node');
+
+        // Node content
+        const typeSpan = document.createElement('span');
+        typeSpan.textContent = item.type === 'value' ? `Value: ${item.value}` : `${item.type} Logic`; 
+        const childrenDiv = document.createElement('div');
+        if (item.values && item.values.length > 0) {
+          childrenDiv.appendChild(document.createTextNode('Children:'));
+          renderTree(item.values, indent + 1); // Recursive call for children
+        } else {
+          childrenDiv.textContent = ' '; // Empty if no children
+        }
+
+        nodeDiv.appendChild(typeSpan);
+        li.appendChild(nodeDiv);
+        ul.appendChild(li);
+      }
+      return ul; 
+    }
+  </script>
+
+</body>
+</html>
+
+
