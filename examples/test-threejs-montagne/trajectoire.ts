@@ -1,6 +1,6 @@
 import { Vector3 } from "three";
 import { defineVue } from "./node_modules/tauri-kargo-tools/src/vue";
-import {  createClient } from "./node_modules/tauri-kargo-tools/src/api";
+import { createClient } from "./node_modules/tauri-kargo-tools/src/api";
 import { creerFunction, PointFeature } from "./spi"
 interface Point {
 
@@ -80,7 +80,7 @@ export class PlacerPointsPourTrajectoire {
         // const ro = new ResizeObserver(() => this.fitCanvasToParent());
         //  ro.observe(this.canvas);
 
-        this.fitCanvasToParent()
+    //    this.fitCanvasToParent()
         this.drawGrid2D()
 
 

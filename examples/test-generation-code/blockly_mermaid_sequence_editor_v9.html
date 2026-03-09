@@ -1,0 +1,1857 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blockly → Mermaid Sequence Diagram</title>
+  <script src="https://cdn.jsdelivr.net/npm/blockly/blockly.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel2: #1f2937;
+      --panel3: #0b1220;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent2: #0ea5e9;
+      --danger: #ef4444;
+      --ok: #10b981;
+      --border: #334155;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, Arial, sans-serif;
+      overflow-x: hidden;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 8px 10px;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #111827 0%, #0f172a 100%);
+      min-width: 0;
+      flex-wrap: wrap;
+      overflow: hidden;
+    }
+
+    .topbar-title {
+      flex: 0 0 auto;
+      font-size: 16px;
+      font-weight: 700;
+      padding-right: 2px;
+      line-height: 1.1;
+    }
+
+    .toolbar-controls {
+      flex: 1 1 900px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      flex-wrap: wrap;
+    }
+
+    .toolbar-spacer {
+      flex: 1 1 14px;
+      min-width: 8px;
+    }
+
+    .field input,
+    .field select,
+    button,
+    textarea {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 8px 10px;
+      font: inherit;
+      min-width: 0;
+    }
+
+    button {
+      cursor: pointer;
+      transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      border-color: #64748b;
+    }
+
+    button.primary {
+      background: var(--accent2);
+      color: white;
+      border-color: #0284c7;
+    }
+
+    button.secondary {
+      background: #1e293b;
+    }
+
+    button.danger {
+      background: #3f1d1d;
+      border-color: #7f1d1d;
+      color: #fecaca;
+    }
+
+    .participants-manager-row {
+      display: grid;
+      grid-template-columns: minmax(180px, 1.4fr) 140px auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .participants-manager-row.secondary {
+      grid-template-columns: auto;
+    }
+
+    .participants-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-height: 52px;
+      max-height: 24vh;
+      overflow: auto;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #0b1220;
+    }
+
+    .participant-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 8px 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: #111827;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .participant-chip-type {
+      color: var(--accent);
+    }
+
+    .participant-chip-remove {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border: 0;
+      border-radius: 999px;
+      padding: 0;
+      background: transparent;
+      color: #fca5a5;
+      font-size: 14px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .participant-chip-remove:hover {
+      background: rgba(239, 68, 68, 0.15);
+      color: #fecaca;
+      transform: none;
+    }
+
+    .dialog-help {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .tab-btn {
+      background: #0f172a;
+      color: var(--muted);
+    }
+
+    .tab-btn.active {
+      color: white;
+      background: #111827;
+      border-color: var(--border);
+    }
+
+    .main {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tab-panel {
+      display: none;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .tab-panel.active {
+      display: flex;
+      flex-direction: column;
+    }
+
+
+    .hint {
+      padding: 10px 16px 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    #blocklyArea {
+      position: relative;
+      flex: 1;
+      min-height: 760px;
+      background: var(--panel3);
+    }
+
+    #blocklyDiv {
+      position: absolute;
+      inset: 0;
+    }
+
+    .empty-overlay {
+      position: absolute;
+      inset: 12px;
+      border: 2px dashed var(--border);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px;
+      color: var(--muted);
+      background: rgba(15, 23, 42, 0.45);
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .mermaid-layout {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(360px, 0.8fr) minmax(900px, 1.7fr);
+    }
+
+    .code-panel,
+    .preview-panel {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .code-panel {
+      border-right: 1px solid var(--border);
+      background: #020617;
+    }
+
+    #mermaidCode {
+      flex: 1;
+      width: 100%;
+      resize: none;
+      border: 0;
+      border-radius: 0;
+      background: #020617;
+      color: #cbd5e1;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 14px;
+      line-height: 1.55;
+      padding: 18px 20px;
+      outline: none;
+    }
+
+    .mermaid-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .code-panel {
+      display: none;
+    }
+
+    #mermaidCode {
+      display: none;
+    }
+
+    #previewViewport {
+      flex: 1;
+      overflow: auto;
+      background: white;
+      color: black;
+      padding: 24px;
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+    }
+
+    #previewViewport.panning {
+      cursor: grabbing;
+    }
+
+    #previewInner svg {
+      pointer-events: none;
+    }
+
+    #previewCanvas {
+      min-width: max-content;
+      min-height: 100%;
+    }
+
+    #previewInner {
+      display: inline-block;
+      transform-origin: top left;
+    }
+
+    .error {
+      margin: 16px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: #fff1f2;
+      color: #881337;
+      border: 1px solid #fecdd3;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      white-space: pre-wrap;
+    }
+
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 1000;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal {
+      width: min(1100px, 100%);
+      max-height: min(85vh, 1000px);
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--panel2);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+      overflow: hidden;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      background: #0b1220;
+    }
+
+    .modal-title {
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .modal-body {
+      padding: 12px;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 0 12px 12px;
+    }
+
+    .modal textarea {
+      width: 100%;
+      min-height: min(60vh, 720px);
+      resize: vertical;
+      background: #020617;
+      color: #cbd5e1;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      line-height: 1.5;
+    }
+
+    .status-bar {
+      padding: 8px 16px;
+      border-top: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .status-bar strong {
+      color: var(--text);
+    }
+
+    @media (max-width: 1000px) {
+      .mermaid-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 1200px) {
+      .topbar {
+        gap: 6px;
+      }
+
+      .topbar-title {
+        font-size: 15px;
+      }
+
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-title">Éditeur Blockly → Mermaid</div>
+    <div class="toolbar-controls">
+      <button id="manageParticipantsBtn" class="secondary" type="button">Gérer participants / actors</button>
+      <div class="toolbar-spacer"></div>
+      <button id="tabBlockly" class="tab-btn active" type="button">Blockly</button>
+      <button id="tabMermaid" class="tab-btn" type="button">Mermaid</button>
+      <button id="showSourceBtn" class="secondary" type="button">Source Mermaid</button>
+      <button id="importSourceBtn" class="secondary" type="button">Initialiser depuis Mermaid</button>
+      <button id="exportHtmlBtn" class="primary" type="button">Exporter HTML</button>
+    </div>
+  </header>
+
+  <main class="main">
+    <section id="panelBlockly" class="tab-panel active">
+      <div id="blocklyArea">
+        <div id="blocklyDiv"></div>
+        <div id="emptyOverlay" class="empty-overlay">
+          Ajoute au moins un participant via le bouton <strong>Gérer participants / actors</strong> pour commencer. Ensuite, complète le bloc racine <strong>sequence</strong> avec des messages, conditions, notes, activations ou boucles.
+        </div>
+      </div>
+    </section>
+
+    <section id="panelMermaid" class="tab-panel">
+      <div class="mermaid-layout">
+        <div class="code-panel">
+          <textarea id="mermaidCode" spellcheck="false"></textarea>
+        </div>
+        <div class="preview-panel">
+          <div id="previewViewport">
+            <div id="previewCanvas">
+              <div id="previewInner"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <div id="generationInfo" style="display:none"></div>
+  </main>
+
+
+  
+  <div id="participantsDialog" class="modal-overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="participantsDialogTitle">
+      <div class="modal-header">
+        <div id="participantsDialogTitle" class="modal-title">Gérer les participants et actors</div>
+        <button id="closeParticipantsDialogBtn" class="secondary" type="button">Fermer</button>
+      </div>
+      <div class="modal-body">
+        <div class="dialog-help">Ajoute, supprime ou réinitialise les participants utilisés dans les blocs Blockly et dans le diagramme Mermaid.</div>
+        <div class="participants-manager-row">
+          <input id="participantLabel" type="text" placeholder="Nom du participant" aria-label="Nom du participant" />
+          <select id="participantType" aria-label="Type du participant">
+            <option value="participant">participant</option>
+            <option value="actor">actor</option>
+          </select>
+          <button id="addParticipantBtn" class="primary" type="button">Ajouter</button>
+        </div>
+        <div class="participants-manager-row secondary">
+          <button id="clearParticipantsBtn" class="secondary" type="button">Réinitialiser</button>
+        </div>
+        <div id="participantsList" class="participants-list" aria-live="polite"></div>
+      </div>
+    </div>
+  </div>
+
+<div id="sourceDialog" class="modal-overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="sourceDialogTitle">
+      <div class="modal-header">
+        <div id="sourceDialogTitle" class="modal-title">Source Mermaid du diagramme</div>
+        <button id="closeSourceDialogBtn" class="secondary" type="button">Fermer</button>
+      </div>
+      <div class="modal-body">
+        <textarea id="sourceDialogTextarea" spellcheck="false" readonly></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div id="importDialog" class="modal-overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="importDialogTitle">
+      <div class="modal-header">
+        <div id="importDialogTitle" class="modal-title">Initialiser l'éditeur depuis un source Mermaid</div>
+        <button id="closeImportDialogBtn" class="secondary" type="button">Fermer</button>
+      </div>
+      <div class="modal-body">
+        <textarea id="importDialogTextarea" spellcheck="false" placeholder="Colle ici un source Mermaid de diagramme de séquence...
+
+sequenceDiagram
+participant client as "Client"
+participant serveur as "Serveur"
+client->>serveur: requête"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button id="applyImportBtn" class="primary" type="button">Initialiser l'éditeur</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'blockly-mermaid-sequence-builder-v9';
+
+    let participants = [];
+    let workspace = null;
+    let activeTab = 'blockly';
+    let previewScale = 1;
+
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'loose',
+      theme: 'default'
+    });
+
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
+    }
+
+    function sanitizeId(label) {
+      let base = String(label || 'participant')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .toLowerCase();
+      if (!base) base = 'participant';
+      if (!/^[a-zA-Z_]/.test(base)) base = 'p_' + base;
+      let candidate = base;
+      let i = 2;
+      while (participants.some(p => p.id === candidate)) {
+        candidate = base + '_' + i++;
+      }
+      return candidate;
+    }
+
+    function participantOptions() {
+      if (!participants.length) {
+        return [['(aucun participant)', '__none__']];
+      }
+      return participants.map(p => [`${p.label} [${p.id}]`, p.id]);
+    }
+
+    function firstParticipantId() {
+      return participants[0]?.id || '__none__';
+    }
+
+    function secondParticipantId() {
+      return participants[1]?.id || participants[0]?.id || '__none__';
+    }
+
+    function textField(defaultValue = '') {
+      return new Blockly.FieldTextInput(defaultValue);
+    }
+
+    function participantField() {
+      return new Blockly.FieldDropdown(() => participantOptions());
+    }
+
+    function getField(block, name, fallback = '') {
+      try {
+        return block.getFieldValue(name) ?? fallback;
+      } catch {
+        return fallback;
+      }
+    }
+
+    function safeText(str) {
+      return String(str ?? '')
+        .replaceAll('\r\n', '\n')
+        .replaceAll('\r', '\n')
+        .replaceAll('\n', '<br/>');
+    }
+
+    function quoteLabel(str) {
+      return JSON.stringify(String(str ?? ''));
+    }
+
+    function normalizeMermaidText(str) {
+      return String(str ?? '').replace(/<br\s*\/?>/gi, '\n');
+    }
+
+    function decodeQuotedLabel(str) {
+      const value = String(str ?? '').trim();
+      if (!value) return '';
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        try {
+          return JSON.parse(value.replace(/^'/, '"').replace(/'$/, '"'));
+        } catch {
+          return value.slice(1, -1);
+        }
+      }
+      return value;
+    }
+
+    function ensureParticipantRef(id, label = null, type = 'participant') {
+      const cleanId = String(id || '').trim();
+      if (!cleanId || cleanId === '__none__') return '__none__';
+      const existing = participants.find(p => p.id === cleanId);
+      if (existing) {
+        if (label && (!existing.label || existing.label === existing.id)) existing.label = label;
+        if (type === 'actor') existing.type = 'actor';
+        return cleanId;
+      }
+      participants.push({ id: cleanId, label: label || cleanId, type: type === 'actor' ? 'actor' : 'participant' });
+      return cleanId;
+    }
+
+    function parseMessageLine(line) {
+      const match = line.match(/^([A-Za-z_][\w]*)\s*(-->>|->>|-->|->|--\)|-\)|--x|-x)\s*([A-Za-z_][\w]*)\s*:\s*(.*)$/);
+      if (!match) return null;
+      const [, from, arrow, to, text] = match;
+      ensureParticipantRef(from);
+      ensureParticipantRef(to);
+      return { type: 'seq_message', fields: { FROM: from, ARROW: arrow, TO: to, TEXT: normalizeMermaidText(text) } };
+    }
+
+    function parseNoteLine(line) {
+      let match = line.match(/^Note\s+(right of|left of)\s+([A-Za-z_][\w]*)\s*:\s*(.*)$/i);
+      if (match) {
+        const [, pos, actor, text] = match;
+        ensureParticipantRef(actor);
+        return { type: 'seq_note', fields: { POS: pos.toLowerCase(), ACTOR1: actor, ACTOR2: actor, TEXT: normalizeMermaidText(text) } };
+      }
+      match = line.match(/^Note\s+over\s+([A-Za-z_][\w]*)\s*,\s*([A-Za-z_][\w]*)\s*:\s*(.*)$/i);
+      if (match) {
+        const [, actor1, actor2, text] = match;
+        ensureParticipantRef(actor1);
+        ensureParticipantRef(actor2);
+        return { type: 'seq_note', fields: { POS: 'over_two', ACTOR1: actor1, ACTOR2: actor2, TEXT: normalizeMermaidText(text) } };
+      }
+      match = line.match(/^Note\s+over\s+([A-Za-z_][\w]*)\s*:\s*(.*)$/i);
+      if (match) {
+        const [, actor, text] = match;
+        ensureParticipantRef(actor);
+        return { type: 'seq_note', fields: { POS: 'over_one', ACTOR1: actor, ACTOR2: actor, TEXT: normalizeMermaidText(text) } };
+      }
+      return null;
+    }
+
+    function parseParticipantDeclaration(line) {
+      const match = line.match(/^(participant|actor)\s+([A-Za-z_][\w]*)(?:\s+as\s+(.+))?$/i);
+      if (!match) return false;
+      const [, type, id, rawLabel] = match;
+      ensureParticipantRef(id, rawLabel ? decodeQuotedLabel(rawLabel) : id, type.toLowerCase());
+      return true;
+    }
+
+    function parseMermaidSourceToModel(source) {
+      const text = String(source ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      const rawLines = text.split('\n').map(line => line.trim()).filter(Boolean);
+      if (!rawLines.length) {
+        throw new Error('Le source Mermaid est vide.');
+      }
+
+      const lines = [...rawLines];
+      if (/^sequenceDiagram$/i.test(lines[0])) {
+        lines.shift();
+      }
+
+      participants = [];
+      const root = { type: 'seq_root', children: { BODY: [] } };
+      const stack = [{ kind: 'root', node: root, section: 'BODY', list: root.children.BODY }];
+      const currentFrame = () => stack[stack.length - 1];
+      const pushNode = (node) => currentFrame().list.push(node);
+
+      for (const line of lines) {
+        if (!line) continue;
+        if (parseParticipantDeclaration(line)) continue;
+
+        let match = line.match(/^%%\s?(.*)$/);
+        if (match) {
+          pushNode({ type: 'seq_comment', fields: { TEXT: normalizeMermaidText(match[1]) } });
+          continue;
+        }
+
+        match = line.match(/^activate\s+([A-Za-z_][\w]*)$/i);
+        if (match) {
+          ensureParticipantRef(match[1]);
+          pushNode({ type: 'seq_activate', fields: { ACTOR: match[1] } });
+          continue;
+        }
+
+        match = line.match(/^deactivate\s+([A-Za-z_][\w]*)$/i);
+        if (match) {
+          ensureParticipantRef(match[1]);
+          pushNode({ type: 'seq_deactivate', fields: { ACTOR: match[1] } });
+          continue;
+        }
+
+        const noteNode = parseNoteLine(line);
+        if (noteNode) {
+          pushNode(noteNode);
+          continue;
+        }
+
+        const msgNode = parseMessageLine(line);
+        if (msgNode) {
+          pushNode(msgNode);
+          continue;
+        }
+
+        match = line.match(/^loop\s*(.*)$/i);
+        if (match) {
+          const node = { type: 'seq_loop', fields: { LABEL: normalizeMermaidText(match[1] || '') }, children: { DO: [] } };
+          pushNode(node);
+          stack.push({ kind: 'single', node, section: 'DO', list: node.children.DO });
+          continue;
+        }
+
+        match = line.match(/^opt\s*(.*)$/i);
+        if (match) {
+          const node = { type: 'seq_opt', fields: { LABEL: normalizeMermaidText(match[1] || '') }, children: { DO: [] } };
+          pushNode(node);
+          stack.push({ kind: 'single', node, section: 'DO', list: node.children.DO });
+          continue;
+        }
+
+        match = line.match(/^break\s*(.*)$/i);
+        if (match) {
+          const node = { type: 'seq_break', fields: { LABEL: normalizeMermaidText(match[1] || '') }, children: { DO: [] } };
+          pushNode(node);
+          stack.push({ kind: 'single', node, section: 'DO', list: node.children.DO });
+          continue;
+        }
+
+        match = line.match(/^par\s*(.*)$/i);
+        if (match) {
+          const node = { type: 'seq_par', fields: { LABEL1: normalizeMermaidText(match[1] || ''), LABEL2: 'branche B' }, children: { DO1: [], DO2: [] } };
+          pushNode(node);
+          stack.push({ kind: 'par', node, section: 'DO1', list: node.children.DO1 });
+          continue;
+        }
+
+        match = line.match(/^and\s*(.*)$/i);
+        if (match) {
+          const frame = currentFrame();
+          if (frame.kind !== 'par') throw new Error('Ligne "and" trouvée en dehors d\'un bloc par.');
+          frame.section = 'DO2';
+          frame.list = frame.node.children.DO2;
+          frame.node.fields.LABEL2 = normalizeMermaidText(match[1] || '');
+          continue;
+        }
+
+        match = line.match(/^critical\s*(.*)$/i);
+        if (match) {
+          const node = { type: 'seq_critical', fields: { LABEL: normalizeMermaidText(match[1] || ''), OPTION_LABEL: 'alternative' }, children: { MAIN: [], OPTION: [] } };
+          pushNode(node);
+          stack.push({ kind: 'critical', node, section: 'MAIN', list: node.children.MAIN });
+          continue;
+        }
+
+        match = line.match(/^option\s*(.*)$/i);
+        if (match) {
+          const frame = currentFrame();
+          if (frame.kind !== 'critical') throw new Error('Ligne "option" trouvée en dehors d\'un bloc critical.');
+          frame.section = 'OPTION';
+          frame.list = frame.node.children.OPTION;
+          frame.node.fields.OPTION_LABEL = normalizeMermaidText(match[1] || '');
+          continue;
+        }
+
+        match = line.match(/^alt\s*(.*)$/i);
+        if (match) {
+          const node = { type: 'seq_alt', fields: { IF_LABEL: normalizeMermaidText(match[1] || ''), ELSE_LABEL: 'sinon' }, children: { THEN: [], ELSE: [] } };
+          pushNode(node);
+          stack.push({ kind: 'alt', node, section: 'THEN', list: node.children.THEN });
+          continue;
+        }
+
+        match = line.match(/^else(?:\s+(.*))?$/i);
+        if (match) {
+          const frame = currentFrame();
+          if (frame.kind !== 'alt') throw new Error('Ligne "else" trouvée en dehors d\'un bloc alt.');
+          frame.section = 'ELSE';
+          frame.list = frame.node.children.ELSE;
+          if (typeof match[1] === 'string') frame.node.fields.ELSE_LABEL = normalizeMermaidText(match[1]);
+          continue;
+        }
+
+        if (/^end$/i.test(line)) {
+          if (stack.length === 1) throw new Error('"end" en trop dans le source Mermaid.');
+          stack.pop();
+          continue;
+        }
+
+        throw new Error('Ligne Mermaid non reconnue : ' + line);
+      }
+
+      if (stack.length !== 1) {
+        throw new Error('Le source Mermaid contient un bloc non fermé (alt/opt/loop/par/critical/break).');
+      }
+
+      return root;
+    }
+
+    function createBlockFromModel(node) {
+      const block = workspace.newBlock(node.type);
+      const fields = node.fields || {};
+      Object.entries(fields).forEach(([name, value]) => {
+        try {
+          if (block.getField(name)) block.setFieldValue(String(value ?? ''), name);
+        } catch {
+          // ignore invalid field assignments
+        }
+      });
+      block.initSvg();
+      block.render();
+
+      const children = node.children || {};
+      Object.entries(children).forEach(([inputName, list]) => {
+        const chain = createChainFromModel(list || []);
+        const input = block.getInput(inputName);
+        if (chain.first && input && input.connection && chain.first.previousConnection) {
+          input.connection.connect(chain.first.previousConnection);
+        }
+      });
+      return block;
+    }
+
+    function createChainFromModel(list) {
+      let first = null;
+      let previous = null;
+      for (const node of list || []) {
+        const block = createBlockFromModel(node);
+        if (!first) first = block;
+        if (previous && previous.nextConnection && block.previousConnection) {
+          previous.nextConnection.connect(block.previousConnection);
+        }
+        previous = block;
+      }
+      return { first, last: previous };
+    }
+
+    function applyMermaidSourceToEditor(source) {
+      const model = parseMermaidSourceToModel(source);
+      ensureWorkspace();
+      workspace.clear();
+      renderParticipants();
+      refreshWorkspaceToolbox();
+      const root = ensureSingleRootBlock();
+      const chain = createChainFromModel(model.children?.BODY || []);
+      const bodyConnection = root.getInput('BODY').connection;
+      if (chain.first && bodyConnection && chain.first.previousConnection) {
+        bodyConnection.connect(chain.first.previousConnection);
+      }
+      renderParticipants();
+      refreshWorkspaceToolbox();
+      saveState();
+      if (activeTab === 'mermaid') {
+        return renderMermaidFromBlocks();
+      }
+    }
+
+    function openDialog(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.add('open');
+      el.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeDialog(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.remove('open');
+      el.setAttribute('aria-hidden', 'true');
+    }
+
+    function openSourceDialog() {
+      const code = buildMermaidCode();
+      document.getElementById('sourceDialogTextarea').value = code;
+      openDialog('sourceDialog');
+    }
+
+    function openImportDialog() {
+      const target = document.getElementById('importDialogTextarea');
+      if (!target.value.trim()) target.value = buildMermaidCode();
+      openDialog('importDialog');
+      setTimeout(() => target.focus(), 0);
+    }
+
+    function openParticipantsDialog() {
+      renderParticipants();
+      openDialog('participantsDialog');
+      setTimeout(() => {
+        const input = document.getElementById('participantLabel');
+        if (input) input.focus();
+      }, 0);
+    }
+
+    async function applyImportDialog() {
+      const source = document.getElementById('importDialogTextarea').value;
+      try {
+        await applyMermaidSourceToEditor(source);
+        closeDialog('importDialog');
+      } catch (error) {
+        alert('Import Mermaid impossible : ' + (error?.message || String(error)));
+      }
+    }
+
+    function indentLines(lines, level) {
+      const prefix = '  '.repeat(level);
+      return lines.map(line => prefix + line);
+    }
+
+    function defineBlocks() {
+      if (Blockly.Blocks['seq_root']) return;
+
+      Blockly.Blocks['seq_root'] = {
+        init: function() {
+          this.appendDummyInput()
+            .appendField('sequence');
+          this.appendStatementInput('BODY')
+            .appendField('contenu');
+          this.setColour(260);
+          this.setTooltip('Bloc racine obligatoire du diagramme de séquence.');
+          this.setMovable(false);
+          this.setDeletable(false);
+          this.setEditable(true);
+        }
+      };
+
+      Blockly.Blocks['seq_message'] = {
+        init: function() {
+          this.appendDummyInput()
+            .appendField('message de')
+            .appendField(participantField(), 'FROM')
+            .appendField(new Blockly.FieldDropdown([
+              ['synchrone →→', '->>'],
+              ['retour -->>', '-->>'],
+              ['asynchrone -)', '-)'],
+              ['pointillé --)', '--)'],
+              ['sans flèche ->', '->'],
+              ['sans flèche -->', '-->'],
+              ['erreur -x', '-x'],
+              ['erreur --x', '--x']
+            ]), 'ARROW')
+            .appendField(participantField(), 'TO');
+          this.appendDummyInput()
+            .appendField('texte')
+            .appendField(textField('appel'), 'TEXT');
+          this.setPreviousStatement(true);
+          this.setNextStatement(true);
+          this.setColour(210);
+        }
+      };
+
+      Blockly.Blocks['seq_note'] = {
+        init: function() {
+          this.appendDummyInput()
+            .appendField('note')
+            .appendField(new Blockly.FieldDropdown([
+              ['right of', 'right of'],
+              ['left of', 'left of'],
+              ['over (1 participant)', 'over_one'],
+              ['over (2 participants)', 'over_two']
+            ]), 'POS')
+            .appendField(participantField(), 'ACTOR1')
+            .appendField(participantField(), 'ACTOR2');
+          this.appendDummyInput()
+            .appendField('texte')
+            .appendField(textField('note'), 'TEXT');
+          this.setPreviousStatement(true);
+          this.setNextStatement(true);
+          this.setColour(60);
+        }
+      };
+
+      Blockly.Blocks['seq_activate'] = {
+        init: function() {
+          this.appendDummyInput()
+            .appendField('activate')
+            .appendField(participantField(), 'ACTOR');
+          this.setPreviousStatement(true);
+          this.setNextStatement(true);
+          this.setColour(120);
+        }
+      };
+
+      Blockly.Blocks['seq_deactivate'] = {
+        init: function() {
+          this.appendDummyInput()
+            .appendField('deactivate')
+            .appendField(participantField(), 'ACTOR');
+          this.setPreviousStatement(true);
+          this.setNextStatement(true);
+          this.setColour(120);
+        }
+      };
+
+      Blockly.Blocks['seq_loop'] = {
+        init: function() {
+          this.appendDummyInput()
+            .appendField('loop')
+            .appendField(textField('tant que condition'), 'LABEL');
+          this.appendStatementInput('DO')
+            .appendField('faire');
+          this.setPreviousStatement(true);
+          this.setNextStatement(true);
+          this.setColour(290);
+        }
+      };
+
+      Blockly.Blocks['seq_opt'] = {
+        init: function() {
+          this.appendDummyInput()
+            .appendField('opt')
+            .appendField(textField('condition vraie'), 'LABEL');
+          this.appendStatementInput('DO')
+            .appendField('alors');
+          this.setPreviousStatement(true);
+          this.setNextStatement(true);
+          this.setColour(290);
+        }
+      };
+
+      Blockly.Blocks['seq_alt'] = {
+        init: function() {
+          this.appendDummyInput()
+            .appendField('alt')
+            .appendField(textField('si'), 'IF_LABEL');
+          this.appendStatementInput('THEN')
+            .appendField('branche si');
+          this.appendDummyInput()
+            .appendField('else')
+            .appendField(textField('sinon'), 'ELSE_LABEL');
+          this.appendStatementInput('ELSE')
+            .appendField('branche sinon');
+          this.setPreviousStatement(true);
+          this.setNextStatement(true);
+          this.setColour(290);
+        }
+      };
+
+      Blockly.Blocks['seq_break'] = {
+        init: function() {
+          this.appendDummyInput()
+            .appendField('break')
+            .appendField(textField('erreur métier'), 'LABEL');
+          this.appendStatementInput('DO')
+            .appendField('contenu');
+          this.setPreviousStatement(true);
+          this.setNextStatement(true);
+          this.setColour(0);
+        }
+      };
+
+      Blockly.Blocks['seq_par'] = {
+        init: function() {
+          this.appendDummyInput()
+            .appendField('par')
+            .appendField(textField('branche A'), 'LABEL1');
+          this.appendStatementInput('DO1')
+            .appendField('branche A');
+          this.appendDummyInput()
+            .appendField('and')
+            .appendField(textField('branche B'), 'LABEL2');
+          this.appendStatementInput('DO2')
+            .appendField('branche B');
+          this.setPreviousStatement(true);
+          this.setNextStatement(true);
+          this.setColour(330);
+        }
+      };
+
+      Blockly.Blocks['seq_critical'] = {
+        init: function() {
+          this.appendDummyInput()
+            .appendField('critical')
+            .appendField(textField('partie critique'), 'LABEL');
+          this.appendStatementInput('MAIN')
+            .appendField('contenu critique');
+          this.appendDummyInput()
+            .appendField('option')
+            .appendField(textField('gestion alternative'), 'OPTION_LABEL');
+          this.appendStatementInput('OPTION')
+            .appendField('contenu option');
+          this.setPreviousStatement(true);
+          this.setNextStatement(true);
+          this.setColour(30);
+        }
+      };
+
+      Blockly.Blocks['seq_comment'] = {
+        init: function() {
+          this.appendDummyInput()
+            .appendField('commentaire')
+            .appendField(textField('texte ignoré par Mermaid'), 'TEXT');
+          this.setPreviousStatement(true);
+          this.setNextStatement(true);
+          this.setColour(200);
+        }
+      };
+    }
+
+    function toolboxConfig() {
+      return {
+        kind: 'categoryToolbox',
+        contents: [
+          {
+            kind: 'category',
+            name: 'Messages',
+            colour: '#0ea5e9',
+            contents: [
+              { kind: 'block', type: 'seq_message' },
+              { kind: 'block', type: 'seq_note' },
+              { kind: 'block', type: 'seq_activate' },
+              { kind: 'block', type: 'seq_deactivate' }
+            ]
+          },
+          {
+            kind: 'category',
+            name: 'Conditions',
+            colour: '#a855f7',
+            contents: [
+              { kind: 'block', type: 'seq_alt' },
+              { kind: 'block', type: 'seq_opt' },
+              { kind: 'block', type: 'seq_loop' },
+              { kind: 'block', type: 'seq_break' },
+              { kind: 'block', type: 'seq_par' },
+              { kind: 'block', type: 'seq_critical' }
+            ]
+          },
+          {
+            kind: 'category',
+            name: 'Divers',
+            colour: '#64748b',
+            contents: [
+              { kind: 'block', type: 'seq_comment' }
+            ]
+          }
+        ]
+      };
+    }
+
+    function ensureWorkspace() {
+      if (workspace) return workspace;
+      defineBlocks();
+      workspace = Blockly.inject('blocklyDiv', {
+        toolbox: toolboxConfig(),
+        trashcan: true,
+        move: { scrollbars: true, drag: true, wheel: true },
+        zoom: { controls: false, wheel: true, startScale: 0.95, maxScale: 2, minScale: 0.4, scaleSpeed: 1.1 },
+        grid: { spacing: 20, length: 3, colour: '#334155', snap: true },
+        theme: Blockly.Themes.Zelos
+      });
+      workspace.addChangeListener(() => {
+        ensureSingleRootBlock();
+        updateBlocklyZoomLabel();
+        saveState();
+      });
+      ensureSingleRootBlock();
+      updateBlocklyZoomLabel();
+      return workspace;
+    }
+
+    function findRootBlock() {
+      if (!workspace) return null;
+      const roots = workspace.getBlocksByType('seq_root', false);
+      return roots[0] || null;
+    }
+
+    function lockRootBlock(root) {
+      if (!root) return;
+      root.setMovable(false);
+      root.setDeletable(false);
+      root.setCollapsed(false);
+      root.setEditable(true);
+    }
+
+    function ensureSingleRootBlock() {
+      ensureWorkspace();
+      const roots = workspace.getBlocksByType('seq_root', false);
+      if (!roots.length) {
+        const root = workspace.newBlock('seq_root');
+        root.initSvg();
+        root.render();
+        root.moveBy(40, 30);
+        lockRootBlock(root);
+        return root;
+      }
+      const [first, ...extra] = roots;
+      lockRootBlock(first);
+      extra.forEach(block => block.dispose(false));
+      return first;
+    }
+
+    function refreshWorkspaceToolbox() {
+      ensureWorkspace();
+      workspace.updateToolbox(toolboxConfig());
+      document.getElementById('emptyOverlay').style.display = participants.length ? 'none' : 'flex';
+    }
+
+
+    function updateBlocklyZoomLabel() {
+      return;
+    }
+
+    function applyPreviewScale() {
+      const inner = document.getElementById('previewInner');
+      if (inner) {
+        inner.style.transform = `scale(${previewScale})`;
+      }
+    }
+
+    function zoomPreviewAt(clientX, clientY, direction) {
+      const viewport = document.getElementById('previewViewport');
+      if (!viewport) return;
+      const rect = viewport.getBoundingClientRect();
+      const x = clientX - rect.left + viewport.scrollLeft;
+      const y = clientY - rect.top + viewport.scrollTop;
+      const oldScale = previewScale;
+      const factor = direction > 0 ? 1.12 : 1 / 1.12;
+      previewScale = Math.max(0.2, Math.min(5, Math.round(previewScale * factor * 1000) / 1000));
+      if (previewScale === oldScale) return;
+      applyPreviewScale();
+      const ratio = previewScale / oldScale;
+      viewport.scrollLeft = x * ratio - (clientX - rect.left);
+      viewport.scrollTop = y * ratio - (clientY - rect.top);
+      saveState();
+    }
+
+    function attachPreviewInteractions() {
+      const viewport = document.getElementById('previewViewport');
+      if (!viewport || viewport.dataset.bound === '1') return;
+      viewport.dataset.bound = '1';
+
+      let isPanning = false;
+      let startX = 0;
+      let startY = 0;
+      let startScrollLeft = 0;
+      let startScrollTop = 0;
+      let moved = false;
+
+      viewport.addEventListener('wheel', (event) => {
+        event.preventDefault();
+        zoomPreviewAt(event.clientX, event.clientY, event.deltaY < 0 ? 1 : -1);
+      }, { passive: false });
+
+      viewport.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) return;
+        isPanning = true;
+        moved = false;
+        startX = event.clientX;
+        startY = event.clientY;
+        startScrollLeft = viewport.scrollLeft;
+        startScrollTop = viewport.scrollTop;
+        viewport.classList.add('panning');
+        viewport.setPointerCapture(event.pointerId);
+      });
+
+      viewport.addEventListener('pointermove', (event) => {
+        if (!isPanning) return;
+        const dx = event.clientX - startX;
+        const dy = event.clientY - startY;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true;
+        viewport.scrollLeft = startScrollLeft - dx;
+        viewport.scrollTop = startScrollTop - dy;
+      });
+
+      const stopPan = (event) => {
+        if (!isPanning) return;
+        isPanning = false;
+        viewport.classList.remove('panning');
+        if (event && viewport.hasPointerCapture(event.pointerId)) {
+          viewport.releasePointerCapture(event.pointerId);
+        }
+        if (moved) {
+          saveState();
+        }
+      };
+
+      viewport.addEventListener('pointerup', stopPan);
+      viewport.addEventListener('pointercancel', stopPan);
+      viewport.addEventListener('mouseleave', () => {
+        if (!isPanning) viewport.classList.remove('panning');
+      });
+
+      viewport.addEventListener('dragstart', (event) => event.preventDefault());
+    }
+
+    function renderParticipants() {
+      const list = document.getElementById('participantsList');
+      if (!list) return;
+      list.innerHTML = '';
+      participants.forEach(p => {
+        const chip = document.createElement('div');
+        chip.className = 'participant-chip';
+        chip.title = p.id;
+
+        const label = document.createElement('span');
+        label.textContent = p.label;
+        chip.appendChild(label);
+
+        const type = document.createElement('span');
+        type.className = 'participant-chip-type';
+        type.textContent = p.type;
+        chip.appendChild(type);
+
+        const id = document.createElement('span');
+        id.textContent = p.id;
+        chip.appendChild(id);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'participant-chip-remove';
+        removeBtn.setAttribute('aria-label', `Supprimer ${p.label}`);
+        removeBtn.title = `Supprimer ${p.label}`;
+        removeBtn.textContent = '✕';
+        removeBtn.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          removeParticipant(p.id);
+        });
+        chip.appendChild(removeBtn);
+
+        list.appendChild(chip);
+      });
+      if (!participants.length) {
+        const empty = document.createElement('div');
+        empty.className = 'dialog-help';
+        empty.textContent = 'Aucun participant pour le moment.';
+        list.appendChild(empty);
+      }
+    }
+
+    function addParticipant() {
+      const input = document.getElementById('participantLabel');
+      const label = input.value.trim();
+      const type = document.getElementById('participantType').value;
+      if (!label) {
+        alert('Saisis un nom de participant.');
+        input.focus();
+        return;
+      }
+      const id = sanitizeId(label);
+      participants.push({ id, label, type });
+      input.value = '';
+      renderParticipants();
+      refreshWorkspaceToolbox();
+      saveState();
+    }
+
+
+    function removeParticipant(id) {
+      participants = participants.filter(p => p.id !== id);
+      renderParticipants();
+      refreshWorkspaceToolbox();
+      saveState();
+    }
+
+    function stackToLines(startBlock, level = 0) {
+      const lines = [];
+      let current = startBlock;
+      while (current) {
+        lines.push(...blockToLines(current, level));
+        current = current.getNextBlock();
+      }
+      return lines;
+    }
+
+    function blockToLines(block, level = 0) {
+      switch (block.type) {
+        case 'seq_root': {
+          const body = stackToLines(block.getInputTargetBlock('BODY'), level);
+          return body.length ? body : indentLines(['%% Le bloc sequence est vide'], level);
+        }
+        case 'seq_message': {
+          const from = getField(block, 'FROM', firstParticipantId());
+          const arrow = getField(block, 'ARROW', '->>');
+          const to = getField(block, 'TO', firstParticipantId());
+          const text = safeText(getField(block, 'TEXT', 'appel'));
+          return indentLines([`${from}${arrow}${to}: ${text}`], level);
+        }
+        case 'seq_note': {
+          const pos = getField(block, 'POS', 'right of');
+          const a1 = getField(block, 'ACTOR1', firstParticipantId());
+          const a2 = getField(block, 'ACTOR2', secondParticipantId());
+          const text = safeText(getField(block, 'TEXT', 'note'));
+          if (pos === 'over_two') {
+            return indentLines([`Note over ${a1},${a2}: ${text}`], level);
+          }
+          if (pos === 'over_one') {
+            return indentLines([`Note over ${a1}: ${text}`], level);
+          }
+          return indentLines([`Note ${pos} ${a1}: ${text}`], level);
+        }
+        case 'seq_activate': {
+          return indentLines([`activate ${getField(block, 'ACTOR', firstParticipantId())}`], level);
+        }
+        case 'seq_deactivate': {
+          return indentLines([`deactivate ${getField(block, 'ACTOR', firstParticipantId())}`], level);
+        }
+        case 'seq_loop': {
+          const label = safeText(getField(block, 'LABEL', 'tant que condition'));
+          const body = stackToLines(block.getInputTargetBlock('DO'), level + 1);
+          return indentLines([`loop ${label}`], level).concat(body, indentLines(['end'], level));
+        }
+        case 'seq_opt': {
+          const label = safeText(getField(block, 'LABEL', 'condition vraie'));
+          const body = stackToLines(block.getInputTargetBlock('DO'), level + 1);
+          return indentLines([`opt ${label}`], level).concat(body, indentLines(['end'], level));
+        }
+        case 'seq_alt': {
+          const ifLabel = safeText(getField(block, 'IF_LABEL', 'si'));
+          const elseLabel = safeText(getField(block, 'ELSE_LABEL', 'sinon'));
+          const thenBody = stackToLines(block.getInputTargetBlock('THEN'), level + 1);
+          const elseBody = stackToLines(block.getInputTargetBlock('ELSE'), level + 1);
+          const lines = indentLines([`alt ${ifLabel}`], level).concat(thenBody);
+          if (elseBody.length) {
+            lines.push(...indentLines([elseLabel ? `else ${elseLabel}` : 'else'], level));
+            lines.push(...elseBody);
+          }
+          lines.push(...indentLines(['end'], level));
+          return lines;
+        }
+        case 'seq_break': {
+          const label = safeText(getField(block, 'LABEL', 'erreur'));
+          const body = stackToLines(block.getInputTargetBlock('DO'), level + 1);
+          return indentLines([`break ${label}`], level).concat(body, indentLines(['end'], level));
+        }
+        case 'seq_par': {
+          const label1 = safeText(getField(block, 'LABEL1', 'branche A'));
+          const label2 = safeText(getField(block, 'LABEL2', 'branche B'));
+          const body1 = stackToLines(block.getInputTargetBlock('DO1'), level + 1);
+          const body2 = stackToLines(block.getInputTargetBlock('DO2'), level + 1);
+          const lines = indentLines([`par ${label1}`], level).concat(body1);
+          lines.push(...indentLines([`and ${label2}`], level));
+          lines.push(...body2);
+          lines.push(...indentLines(['end'], level));
+          return lines;
+        }
+        case 'seq_critical': {
+          const label = safeText(getField(block, 'LABEL', 'partie critique'));
+          const optionLabel = safeText(getField(block, 'OPTION_LABEL', 'alternative'));
+          const main = stackToLines(block.getInputTargetBlock('MAIN'), level + 1);
+          const option = stackToLines(block.getInputTargetBlock('OPTION'), level + 1);
+          const lines = indentLines([`critical ${label}`], level).concat(main);
+          if (option.length) {
+            lines.push(...indentLines([`option ${optionLabel}`], level));
+            lines.push(...option);
+          }
+          lines.push(...indentLines(['end'], level));
+          return lines;
+        }
+        case 'seq_comment': {
+          return indentLines([`%% ${safeText(getField(block, 'TEXT', 'commentaire'))}`], level);
+        }
+        default:
+          return indentLines([`%% Bloc non géré: ${block.type}`], level);
+      }
+    }
+
+    function buildMermaidCode() {
+      const lines = ['sequenceDiagram'];
+      participants.forEach(p => {
+        lines.push(`${p.type} ${p.id} as ${quoteLabel(p.label)}`);
+      });
+
+      const root = findRootBlock();
+      if (root) {
+        lines.push(...blockToLines(root, 0));
+      } else {
+        lines.push('%% Bloc racine sequence introuvable');
+      }
+
+      return lines.join('\n');
+    }
+
+    async function renderMermaidFromBlocks() {
+      const code = buildMermaidCode();
+      setMermaidCodeValue(code);
+      await renderMermaidCode(code, 'généré depuis Blockly');
+    }
+
+    async function renderMermaidCode(code, originLabel = 'manuel') {
+      const preview = document.getElementById('previewInner');
+      const info = document.getElementById('generationInfo');
+      preview.innerHTML = '';
+      try {
+        const renderId = 'mermaid_' + Date.now();
+        const result = await mermaid.render(renderId, code);
+        preview.innerHTML = result.svg;
+        if (typeof result.bindFunctions === 'function') {
+          result.bindFunctions(preview);
+        }
+        applyPreviewScale();
+        info.textContent = `Dernière génération : ${originLabel}`;
+      } catch (error) {
+        preview.innerHTML = `<div class="error">${escapeHtml(error?.message || String(error))}</div>`;
+        applyPreviewScale();
+        info.textContent = `Erreur de génération : ${error?.message || String(error)}`;
+      }
+    }
+
+
+    function createStandaloneHtml(code) {
+      const embeddedCode = JSON.stringify(code || '');
+      return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Diagramme de séquence Mermaid</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"><\/script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --border: #334155;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, Arial, sans-serif;
+    }
+    header {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 14px;
+    }
+    #viewport {
+      flex: 1;
+      overflow: auto;
+      background: white;
+      padding: 24px;
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+    }
+    #viewport.panning {
+      cursor: grabbing;
+    }
+    #canvas {
+      min-width: max-content;
+      min-height: 100%;
+    }
+    #diagram {
+      display: inline-block;
+      transform-origin: top left;
+      color: black;
+    }
+    #diagram svg {
+      pointer-events: none;
+    }
+    .error {
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: #fff1f2;
+      color: #881337;
+      border: 1px solid #fecdd3;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <header>Molette : zoom · glisser : déplacer</header>
+  <div id="viewport">
+    <div id="canvas">
+      <div id="diagram"></div>
+    </div>
+  </div>
+
+
+  <script>
+    mermaid.initialize({ startOnLoad: false, securityLevel: 'loose', theme: 'default' });
+    const code = ${embeddedCode};
+    let scale = 1;
+
+    function applyZoom() {
+      const host = document.getElementById('diagram');
+      host.style.transform = 'scale(' + scale + ')';
+    }
+
+    function zoomAt(clientX, clientY, direction) {
+      const viewport = document.getElementById('viewport');
+      const rect = viewport.getBoundingClientRect();
+      const x = clientX - rect.left + viewport.scrollLeft;
+      const y = clientY - rect.top + viewport.scrollTop;
+      const oldScale = scale;
+      const factor = direction > 0 ? 1.12 : 1 / 1.12;
+      scale = Math.max(0.2, Math.min(5, Math.round(scale * factor * 1000) / 1000));
+      if (scale === oldScale) return;
+      applyZoom();
+      const ratio = scale / oldScale;
+      viewport.scrollLeft = x * ratio - (clientX - rect.left);
+      viewport.scrollTop = y * ratio - (clientY - rect.top);
+    }
+
+    function attachInteractions() {
+      const viewport = document.getElementById('viewport');
+      let isPanning = false;
+      let startX = 0;
+      let startY = 0;
+      let startScrollLeft = 0;
+      let startScrollTop = 0;
+
+      viewport.addEventListener('wheel', (event) => {
+        event.preventDefault();
+        zoomAt(event.clientX, event.clientY, event.deltaY < 0 ? 1 : -1);
+      }, { passive: false });
+
+      viewport.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) return;
+        isPanning = true;
+        startX = event.clientX;
+        startY = event.clientY;
+        startScrollLeft = viewport.scrollLeft;
+        startScrollTop = viewport.scrollTop;
+        viewport.classList.add('panning');
+        viewport.setPointerCapture(event.pointerId);
+      });
+
+      viewport.addEventListener('pointermove', (event) => {
+        if (!isPanning) return;
+        const dx = event.clientX - startX;
+        const dy = event.clientY - startY;
+        viewport.scrollLeft = startScrollLeft - dx;
+        viewport.scrollTop = startScrollTop - dy;
+      });
+
+      const stopPan = (event) => {
+        if (!isPanning) return;
+        isPanning = false;
+        viewport.classList.remove('panning');
+        if (event && viewport.hasPointerCapture(event.pointerId)) {
+          viewport.releasePointerCapture(event.pointerId);
+        }
+      };
+
+      viewport.addEventListener('pointerup', stopPan);
+      viewport.addEventListener('pointercancel', stopPan);
+      viewport.addEventListener('dragstart', (event) => event.preventDefault());
+    }
+
+    async function renderDiagram() {
+      const host = document.getElementById('diagram');
+      try {
+        const result = await mermaid.render('standalone_' + Date.now(), code);
+        host.innerHTML = result.svg;
+        if (typeof result.bindFunctions === 'function') {
+          result.bindFunctions(host);
+        }
+      } catch (error) {
+        host.innerHTML = '<div class="error">' + String(error && error.message ? error.message : error)
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;') + '</div>';
+      }
+      applyZoom();
+    }
+
+    attachInteractions();
+    renderDiagram();
+  <\/script>
+</body>
+</html>`;
+    }
+
+    function exportStandaloneHtml() {
+      const code = buildMermaidCode();
+      const html = createStandaloneHtml(code);
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'diagramme_sequence_mermaid.html';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }
+    function clearWorkspace() {
+      ensureWorkspace();
+      workspace.clear();
+      ensureSingleRootBlock();
+      saveState();
+      if (activeTab === 'mermaid') {
+        renderMermaidFromBlocks();
+      }
+    }
+
+    function clearAllParticipants() {
+      participants = [];
+      renderParticipants();
+      refreshWorkspaceToolbox();
+      clearWorkspace();
+      saveState();
+    }
+
+    function sanitizeSerializedWorkspace(node) {
+      const forbidden = new Set(['seq_create', 'seq_destroy']);
+
+      function clean(value) {
+        if (Array.isArray(value)) {
+          const items = value
+            .map(clean)
+            .filter(item => item !== null && item !== undefined);
+          return items;
+        }
+
+        if (!value || typeof value !== 'object') return value;
+        if (forbidden.has(value.type)) return null;
+
+        const out = {};
+        for (const [key, child] of Object.entries(value)) {
+          const cleaned = clean(child);
+          if (cleaned !== null && cleaned !== undefined) {
+            out[key] = cleaned;
+          }
+        }
+        return out;
+      }
+
+      return clean(node);
+    }
+
+    function saveState() {
+      try {
+        const state = {
+          participants,
+          workspace: workspace ? Blockly.serialization.workspaces.save(workspace) : null,
+          activeTab,
+          previewScale
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (error) {
+        console.warn('Sauvegarde locale impossible', error);
+      }
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const state = JSON.parse(raw);
+        participants = Array.isArray(state.participants) ? state.participants : [];
+        activeTab = state.activeTab === 'mermaid' ? 'mermaid' : 'blockly';
+        previewScale = Number(state.previewScale || 1);
+        if (!Number.isFinite(previewScale) || previewScale <= 0) previewScale = 1;
+        renderParticipants();
+        refreshWorkspaceToolbox();
+        if (state.workspace && workspace) {
+          const cleanedWorkspace = sanitizeSerializedWorkspace(state.workspace);
+          Blockly.serialization.workspaces.load(cleanedWorkspace, workspace);
+        }
+        ensureSingleRootBlock();
+      } catch (error) {
+        console.warn('Chargement local impossible', error);
+        ensureSingleRootBlock();
+      }
+    }
+
+    function connectInsideRoot(firstChild) {
+      const root = ensureSingleRootBlock();
+      const bodyConnection = root.getInput('BODY').connection;
+      if (firstChild && bodyConnection && firstChild.previousConnection) {
+        bodyConnection.connect(firstChild.previousConnection);
+      }
+    }
+
+    function setMermaidCodeValue(code) {
+      const el = document.getElementById('mermaidCode');
+      if (el) el.value = code;
+    }
+
+    async function selectTab(tabName) {
+      activeTab = tabName === 'mermaid' ? 'mermaid' : 'blockly';
+      document.getElementById('tabBlockly').classList.toggle('active', activeTab === 'blockly');
+      document.getElementById('tabMermaid').classList.toggle('active', activeTab === 'mermaid');
+      document.getElementById('panelBlockly').classList.toggle('active', activeTab === 'blockly');
+      document.getElementById('panelMermaid').classList.toggle('active', activeTab === 'mermaid');
+      saveState();
+      if (activeTab === 'mermaid') {
+        await renderMermaidFromBlocks();
+      } else if (workspace) {
+        Blockly.svgResize(workspace);
+        updateBlocklyZoomLabel();
+      }
+      applyPreviewScale();
+    }
+
+    document.getElementById('manageParticipantsBtn').addEventListener('click', openParticipantsDialog);
+    document.getElementById('addParticipantBtn').addEventListener('click', addParticipant);
+    document.getElementById('clearParticipantsBtn').addEventListener('click', clearAllParticipants);
+    document.getElementById('tabBlockly').addEventListener('click', () => selectTab('blockly'));
+    document.getElementById('tabMermaid').addEventListener('click', () => selectTab('mermaid'));
+    document.getElementById('participantLabel').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') addParticipant();
+    });
+    document.getElementById('exportHtmlBtn').addEventListener('click', exportStandaloneHtml);
+    document.getElementById('showSourceBtn').addEventListener('click', openSourceDialog);
+    document.getElementById('importSourceBtn').addEventListener('click', openImportDialog);
+    document.getElementById('closeParticipantsDialogBtn').addEventListener('click', () => closeDialog('participantsDialog'));
+    document.getElementById('closeSourceDialogBtn').addEventListener('click', () => closeDialog('sourceDialog'));
+    document.getElementById('closeImportDialogBtn').addEventListener('click', () => closeDialog('importDialog'));
+    document.getElementById('applyImportBtn').addEventListener('click', applyImportDialog);
+
+    ['participantsDialog', 'sourceDialog', 'importDialog'].forEach((id) => {
+      const overlay = document.getElementById(id);
+      overlay.addEventListener('click', (event) => {
+        if (event.target === overlay) closeDialog(id);
+      });
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        closeDialog('participantsDialog');
+        closeDialog('sourceDialog');
+        closeDialog('importDialog');
+      }
+    });
+
+    ensureWorkspace();
+    attachPreviewInteractions();
+    loadState();
+    renderParticipants();
+    refreshWorkspaceToolbox();
+    ensureSingleRootBlock();
+    updateBlocklyZoomLabel();
+    applyPreviewScale();
+    selectTab(activeTab);
+  </script>
+</body>
+</html>
