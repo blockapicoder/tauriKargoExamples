@@ -174,6 +174,69 @@
       line-height: 1.35;
     }
 
+    .diagrams-manager-row {
+      display: grid;
+      grid-template-columns: minmax(220px, 1.6fr) repeat(3, auto);
+      gap: 8px;
+      align-items: center;
+    }
+
+    .diagrams-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 120px;
+      max-height: 48vh;
+      overflow: auto;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #0b1220;
+    }
+
+    .diagram-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #111827;
+      cursor: pointer;
+    }
+
+    .diagram-row.active {
+      border-color: var(--accent2);
+      box-shadow: inset 0 0 0 1px rgba(14, 165, 233, 0.35);
+      background: #0f1d33;
+    }
+
+    .diagram-row-main {
+      min-width: 0;
+    }
+
+    .diagram-row-title {
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .diagram-row-meta {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .diagram-row-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+
     .tab-btn {
       background: #0f172a;
       color: var(--muted);
@@ -408,6 +471,14 @@
       .mermaid-layout {
         grid-template-columns: 1fr;
       }
+
+      .diagrams-manager-row {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .diagrams-manager-row > input {
+        grid-column: 1 / -1;
+      }
     }
 
     @media (max-width: 1200px) {
@@ -426,11 +497,11 @@
   <header class="topbar">
     <div class="topbar-title">Éditeur Blockly → Mermaid</div>
     <div class="toolbar-controls">
+      <button id="manageDiagramsBtn" class="secondary" type="button">Diagrammes</button>
       <button id="manageParticipantsBtn" class="secondary" type="button">Gérer participants / actors</button>
       <div class="toolbar-spacer"></div>
       <button id="tabBlockly" class="tab-btn active" type="button">Blockly</button>
       <button id="tabMermaid" class="tab-btn" type="button">Mermaid</button>
-      <button id="showSourceBtn" class="secondary" type="button">Source Mermaid</button>
       <button id="importSourceBtn" class="secondary" type="button">Initialiser depuis Mermaid</button>
       <button id="exportHtmlBtn" class="primary" type="button">Exporter HTML</button>
     </div>
@@ -489,14 +560,23 @@
     </div>
   </div>
 
-<div id="sourceDialog" class="modal-overlay" aria-hidden="true">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="sourceDialogTitle">
+
+  <div id="diagramsDialog" class="modal-overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="diagramsDialogTitle">
       <div class="modal-header">
-        <div id="sourceDialogTitle" class="modal-title">Source Mermaid du diagramme</div>
-        <button id="closeSourceDialogBtn" class="secondary" type="button">Fermer</button>
+        <div id="diagramsDialogTitle" class="modal-title">Gérer les diagrammes</div>
+        <button id="closeDiagramsDialogBtn" class="secondary" type="button">Fermer</button>
       </div>
       <div class="modal-body">
-        <textarea id="sourceDialogTextarea" spellcheck="false" readonly></textarea>
+        <div class="dialog-help">Ajoute, sélectionne, supprime, importe ou exporte des diagrammes de séquence. L'import JSON remplace la collection courante par celle du fichier chargé.</div>
+        <div class="diagrams-manager-row">
+          <input id="diagramNameInput" type="text" placeholder="Nom du nouveau diagramme" aria-label="Nom du nouveau diagramme" />
+          <button id="addDiagramBtn" class="primary" type="button">Ajouter</button>
+          <button id="exportJsonBtn" class="secondary" type="button">Exporter JSON</button>
+          <button id="importJsonBtn" class="secondary" type="button">Importer JSON</button>
+          <input id="importJsonFileInput" type="file" accept=".json,application/json" hidden />
+        </div>
+        <div id="diagramsList" class="diagrams-list" aria-live="polite"></div>
       </div>
     </div>
   </div>
@@ -522,12 +602,15 @@ client->>serveur: requête"></textarea>
   </div>
 
   <script>
-    const STORAGE_KEY = 'blockly-mermaid-sequence-builder-v9';
+    const STORAGE_KEY = 'blockly-mermaid-sequence-builder-v10';
 
     let participants = [];
     let workspace = null;
     let activeTab = 'blockly';
     let previewScale = 1;
+    let diagrams = [];
+    let activeDiagramId = null;
+    let suspendPersistence = false;
 
     mermaid.initialize({
       startOnLoad: false,
@@ -891,15 +974,9 @@ client->>serveur: requête"></textarea>
       el.setAttribute('aria-hidden', 'true');
     }
 
-    function openSourceDialog() {
-      const code = buildMermaidCode();
-      document.getElementById('sourceDialogTextarea').value = code;
-      openDialog('sourceDialog');
-    }
-
     function openImportDialog() {
       const target = document.getElementById('importDialogTextarea');
-      if (!target.value.trim()) target.value = buildMermaidCode();
+      target.value = buildMermaidCode();
       openDialog('importDialog');
       setTimeout(() => target.focus(), 0);
     }
@@ -909,6 +986,16 @@ client->>serveur: requête"></textarea>
       openDialog('participantsDialog');
       setTimeout(() => {
         const input = document.getElementById('participantLabel');
+        if (input) input.focus();
+      }, 0);
+    }
+
+    function openDiagramsDialog() {
+      persistCurrentDiagramData();
+      renderDiagramsList();
+      openDialog('diagramsDialog');
+      setTimeout(() => {
+        const input = document.getElementById('diagramNameInput');
         if (input) input.focus();
       }, 0);
     }
@@ -1697,8 +1784,12 @@ client->>serveur: requête"></textarea>
       const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
+      const diagramName = (getCurrentDiagram()?.name || 'diagramme_sequence')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9_-]+/g, '_')
+        .replace(/^_+|_+$/g, '') || 'diagramme_sequence';
       link.href = url;
-      link.download = 'diagramme_sequence_mermaid.html';
+      link.download = diagramName + '.html';
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1500);
     }
@@ -1747,40 +1838,340 @@ client->>serveur: requête"></textarea>
       return clean(node);
     }
 
-    function saveState() {
+    function cloneParticipants(list) {
+      return Array.isArray(list) ? list.map(item => ({
+        id: String(item?.id || ''),
+        label: String(item?.label || item?.id || ''),
+        type: item?.type === 'actor' ? 'actor' : 'participant'
+      })).filter(item => item.id) : [];
+    }
+
+    function makeDiagramId() {
+      return 'diagram_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+    }
+
+    function uniqueDiagramName(preferred = 'Diagramme') {
+      const base = String(preferred || 'Diagramme').trim() || 'Diagramme';
+      const used = new Set(diagrams.map(d => d.name));
+      if (!used.has(base)) return base;
+      let i = 2;
+      while (used.has(base + ' ' + i)) i++;
+      return base + ' ' + i;
+    }
+
+    function countBlocksInSerializedWorkspace(node) {
+      function walk(value) {
+        if (!value || typeof value !== 'object') return 0;
+        let count = 0;
+        if (typeof value.type === 'string') count += 1;
+        for (const child of Object.values(value)) {
+          if (Array.isArray(child)) {
+            count += child.reduce((sum, item) => sum + walk(item), 0);
+          } else if (child && typeof child === 'object') {
+            count += walk(child);
+          }
+        }
+        return count;
+      }
+      return walk(node);
+    }
+
+    function createDiagramRecord(name = null) {
+      return {
+        id: makeDiagramId(),
+        name: uniqueDiagramName(name || 'Diagramme'),
+        participants: [],
+        workspace: null,
+        previewScale: 1
+      };
+    }
+
+    function getCurrentDiagram() {
+      return diagrams.find(diagram => diagram.id === activeDiagramId) || null;
+    }
+
+    function updateEditorTitle() {
+      const titleEl = document.querySelector('.topbar-title');
+      const current = getCurrentDiagram();
+      if (titleEl) {
+        titleEl.textContent = 'Éditeur Blockly → Mermaid';
+        titleEl.title = current ? `Diagramme actif : ${current.name}` : 'Éditeur Blockly → Mermaid';
+      }
+      document.title = current ? `${current.name} — Blockly → Mermaid Sequence Diagram` : 'Blockly → Mermaid Sequence Diagram';
+    }
+
+    function persistCurrentDiagramData() {
+      const diagram = getCurrentDiagram();
+      if (!diagram) return;
+      diagram.participants = cloneParticipants(participants);
+      diagram.workspace = workspace ? sanitizeSerializedWorkspace(Blockly.serialization.workspaces.save(workspace)) : null;
+      diagram.previewScale = previewScale;
+    }
+
+    function ensureDiagramCollection() {
+      if (!Array.isArray(diagrams)) diagrams = [];
+      if (!diagrams.length) {
+        const first = createDiagramRecord('Diagramme 1');
+        diagrams.push(first);
+        activeDiagramId = first.id;
+      }
+      if (!diagrams.some(diagram => diagram.id === activeDiagramId)) {
+        activeDiagramId = diagrams[0].id;
+      }
+    }
+
+    function renderDiagramsList() {
+      const list = document.getElementById('diagramsList');
+      if (!list) return;
+      list.innerHTML = '';
+      ensureDiagramCollection();
+      diagrams.forEach((diagram) => {
+        const row = document.createElement('div');
+        row.className = 'diagram-row' + (diagram.id === activeDiagramId ? ' active' : '');
+        row.title = diagram.name;
+
+        const main = document.createElement('div');
+        main.className = 'diagram-row-main';
+
+        const title = document.createElement('div');
+        title.className = 'diagram-row-title';
+        title.textContent = diagram.name;
+        main.appendChild(title);
+
+        const meta = document.createElement('div');
+        meta.className = 'diagram-row-meta';
+        const participantCount = Array.isArray(diagram.participants) ? diagram.participants.length : 0;
+        const blockCount = countBlocksInSerializedWorkspace(diagram.workspace);
+        meta.textContent = `${participantCount} participant(s) · ${Math.max(0, blockCount - 1)} bloc(s)`;
+        main.appendChild(meta);
+
+        const actions = document.createElement('div');
+        actions.className = 'diagram-row-actions';
+
+        const openBtn = document.createElement('button');
+        openBtn.type = 'button';
+        openBtn.className = diagram.id === activeDiagramId ? 'primary' : 'secondary';
+        openBtn.textContent = diagram.id === activeDiagramId ? 'Ouvert' : 'Ouvrir';
+        openBtn.addEventListener('click', async (event) => {
+          event.stopPropagation();
+          await loadDiagramIntoEditor(diagram.id);
+          closeDialog('diagramsDialog');
+        });
+        actions.appendChild(openBtn);
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'danger';
+        deleteBtn.textContent = 'Supprimer';
+        deleteBtn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          deleteDiagram(diagram.id);
+        });
+        actions.appendChild(deleteBtn);
+
+        row.addEventListener('click', async () => {
+          await loadDiagramIntoEditor(diagram.id);
+          closeDialog('diagramsDialog');
+        });
+
+        row.appendChild(main);
+        row.appendChild(actions);
+        list.appendChild(row);
+      });
+    }
+
+    async function loadDiagramIntoEditor(diagramId) {
+      ensureDiagramCollection();
+      const diagram = diagrams.find(item => item.id === diagramId);
+      if (!diagram) return;
+      persistCurrentDiagramData();
+      activeDiagramId = diagram.id;
+      participants = cloneParticipants(diagram.participants);
+      previewScale = Number(diagram.previewScale || 1);
+      if (!Number.isFinite(previewScale) || previewScale <= 0) previewScale = 1;
+
+      ensureWorkspace();
+      suspendPersistence = true;
       try {
+        workspace.clear();
+        renderParticipants();
+        refreshWorkspaceToolbox();
+        if (diagram.workspace) {
+          const cleanedWorkspace = sanitizeSerializedWorkspace(diagram.workspace);
+          Blockly.serialization.workspaces.load(cleanedWorkspace, workspace);
+        }
+        ensureSingleRootBlock();
+      } finally {
+        suspendPersistence = false;
+      }
+
+      renderParticipants();
+      refreshWorkspaceToolbox();
+      applyPreviewScale();
+      updateEditorTitle();
+      renderDiagramsList();
+      saveState();
+      if (activeTab === 'mermaid') {
+        await renderMermaidFromBlocks();
+      } else if (workspace) {
+        Blockly.svgResize(workspace);
+        updateBlocklyZoomLabel();
+      }
+    }
+
+    function addDiagramFromInput() {
+      const input = document.getElementById('diagramNameInput');
+      const rawName = input?.value?.trim();
+      persistCurrentDiagramData();
+      const diagram = createDiagramRecord(rawName || `Diagramme ${diagrams.length + 1}`);
+      diagrams.push(diagram);
+      if (input) input.value = '';
+      loadDiagramIntoEditor(diagram.id);
+      renderDiagramsList();
+    }
+
+    function deleteDiagram(diagramId) {
+      const target = diagrams.find(diagram => diagram.id === diagramId);
+      if (!target) return;
+      if (!confirm(`Supprimer le diagramme "${target.name}" ?`)) return;
+
+      persistCurrentDiagramData();
+      diagrams = diagrams.filter(diagram => diagram.id !== diagramId);
+      if (!diagrams.length) {
+        const fallback = createDiagramRecord('Diagramme 1');
+        diagrams.push(fallback);
+        activeDiagramId = fallback.id;
+      } else if (activeDiagramId === diagramId) {
+        activeDiagramId = diagrams[0].id;
+      }
+
+      renderDiagramsList();
+      loadDiagramIntoEditor(activeDiagramId);
+    }
+
+    function exportDiagramsJson() {
+      persistCurrentDiagramData();
+      const payload = {
+        format: 'blockly-mermaid-sequence-diagrams',
+        version: 1,
+        activeDiagramId,
+        diagrams: diagrams.map(diagram => ({
+          id: diagram.id,
+          name: diagram.name,
+          participants: cloneParticipants(diagram.participants),
+          workspace: sanitizeSerializedWorkspace(diagram.workspace),
+          previewScale: Number(diagram.previewScale || 1) || 1
+        }))
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'diagrammes_sequence_mermaid.json';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+    }
+
+    async function importDiagramsFromFile(file) {
+      if (!file) return;
+      const text = await file.text();
+      let payload;
+      try {
+        payload = JSON.parse(text);
+      } catch {
+        throw new Error('Le fichier JSON est invalide.');
+      }
+
+      const rawDiagrams = Array.isArray(payload) ? payload : payload?.diagrams;
+      if (!Array.isArray(rawDiagrams) || !rawDiagrams.length) {
+        throw new Error('Aucun diagramme trouvé dans le fichier JSON.');
+      }
+
+      const imported = [];
+      const usedIds = new Set();
+      const usedNames = new Set();
+
+      for (const raw of rawDiagrams) {
+        const idBase = String(raw?.id || makeDiagramId()).trim() || makeDiagramId();
+        let id = idBase;
+        while (usedIds.has(id)) id = makeDiagramId();
+        usedIds.add(id);
+
+        let name = String(raw?.name || 'Diagramme').trim() || 'Diagramme';
+        if (usedNames.has(name)) {
+          let i = 2;
+          const base = name;
+          while (usedNames.has(`${base} ${i}`)) i++;
+          name = `${base} ${i}`;
+        }
+        usedNames.add(name);
+
+        imported.push({
+          id,
+          name,
+          participants: cloneParticipants(raw?.participants),
+          workspace: sanitizeSerializedWorkspace(raw?.workspace),
+          previewScale: Number(raw?.previewScale || 1) || 1
+        });
+      }
+
+      diagrams = imported;
+      activeDiagramId = imported.some(diagram => diagram.id === payload?.activeDiagramId)
+        ? payload.activeDiagramId
+        : imported[0].id;
+
+      await loadDiagramIntoEditor(activeDiagramId);
+      closeDialog('diagramsDialog');
+    }
+
+    function saveState() {
+      if (suspendPersistence) return;
+      try {
+        persistCurrentDiagramData();
+        ensureDiagramCollection();
         const state = {
-          participants,
-          workspace: workspace ? Blockly.serialization.workspaces.save(workspace) : null,
-          activeTab,
-          previewScale
+          diagrams: diagrams.map(diagram => ({
+            id: diagram.id,
+            name: diagram.name,
+            participants: cloneParticipants(diagram.participants),
+            workspace: sanitizeSerializedWorkspace(diagram.workspace),
+            previewScale: Number(diagram.previewScale || 1) || 1
+          })),
+          activeDiagramId,
+          activeTab
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        updateEditorTitle();
+        if (document.getElementById('diagramsDialog')?.classList.contains('open')) {
+          renderDiagramsList();
+        }
       } catch (error) {
         console.warn('Sauvegarde locale impossible', error);
       }
     }
 
     function loadState() {
+      ensureWorkspace();
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return;
-        const state = JSON.parse(raw);
-        participants = Array.isArray(state.participants) ? state.participants : [];
-        activeTab = state.activeTab === 'mermaid' ? 'mermaid' : 'blockly';
-        previewScale = Number(state.previewScale || 1);
-        if (!Number.isFinite(previewScale) || previewScale <= 0) previewScale = 1;
-        renderParticipants();
-        refreshWorkspaceToolbox();
-        if (state.workspace && workspace) {
-          const cleanedWorkspace = sanitizeSerializedWorkspace(state.workspace);
-          Blockly.serialization.workspaces.load(cleanedWorkspace, workspace);
+        if (raw) {
+          const state = JSON.parse(raw);
+          diagrams = Array.isArray(state.diagrams) ? state.diagrams.map(diagram => ({
+            id: String(diagram?.id || makeDiagramId()),
+            name: String(diagram?.name || 'Diagramme'),
+            participants: cloneParticipants(diagram?.participants),
+            workspace: sanitizeSerializedWorkspace(diagram?.workspace),
+            previewScale: Number(diagram?.previewScale || 1) || 1
+          })) : [];
+          activeDiagramId = typeof state.activeDiagramId === 'string' ? state.activeDiagramId : null;
+          activeTab = state.activeTab === 'mermaid' ? 'mermaid' : 'blockly';
         }
-        ensureSingleRootBlock();
       } catch (error) {
         console.warn('Chargement local impossible', error);
-        ensureSingleRootBlock();
       }
+
+      ensureDiagramCollection();
+      loadDiagramIntoEditor(activeDiagramId);
     }
 
     function connectInsideRoot(firstChild) {
@@ -1812,6 +2203,7 @@ client->>serveur: requête"></textarea>
       applyPreviewScale();
     }
 
+    document.getElementById('manageDiagramsBtn').addEventListener('click', openDiagramsDialog);
     document.getElementById('manageParticipantsBtn').addEventListener('click', openParticipantsDialog);
     document.getElementById('addParticipantBtn').addEventListener('click', addParticipant);
     document.getElementById('clearParticipantsBtn').addEventListener('click', clearAllParticipants);
@@ -1820,15 +2212,33 @@ client->>serveur: requête"></textarea>
     document.getElementById('participantLabel').addEventListener('keydown', (event) => {
       if (event.key === 'Enter') addParticipant();
     });
+    document.getElementById('diagramNameInput').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') addDiagramFromInput();
+    });
+    document.getElementById('addDiagramBtn').addEventListener('click', addDiagramFromInput);
+    document.getElementById('exportJsonBtn').addEventListener('click', exportDiagramsJson);
+    document.getElementById('importJsonBtn').addEventListener('click', () => {
+      document.getElementById('importJsonFileInput').click();
+    });
+    document.getElementById('importJsonFileInput').addEventListener('change', async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      try {
+        await importDiagramsFromFile(file);
+      } catch (error) {
+        alert('Import JSON impossible : ' + (error?.message || String(error)));
+      } finally {
+        event.target.value = '';
+      }
+    });
     document.getElementById('exportHtmlBtn').addEventListener('click', exportStandaloneHtml);
-    document.getElementById('showSourceBtn').addEventListener('click', openSourceDialog);
     document.getElementById('importSourceBtn').addEventListener('click', openImportDialog);
+    document.getElementById('closeDiagramsDialogBtn').addEventListener('click', () => closeDialog('diagramsDialog'));
     document.getElementById('closeParticipantsDialogBtn').addEventListener('click', () => closeDialog('participantsDialog'));
-    document.getElementById('closeSourceDialogBtn').addEventListener('click', () => closeDialog('sourceDialog'));
     document.getElementById('closeImportDialogBtn').addEventListener('click', () => closeDialog('importDialog'));
     document.getElementById('applyImportBtn').addEventListener('click', applyImportDialog);
 
-    ['participantsDialog', 'sourceDialog', 'importDialog'].forEach((id) => {
+    ['diagramsDialog', 'participantsDialog', 'importDialog'].forEach((id) => {
       const overlay = document.getElementById(id);
       overlay.addEventListener('click', (event) => {
         if (event.target === overlay) closeDialog(id);
@@ -1837,8 +2247,8 @@ client->>serveur: requête"></textarea>
 
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
+        closeDialog('diagramsDialog');
         closeDialog('participantsDialog');
-        closeDialog('sourceDialog');
         closeDialog('importDialog');
       }
     });
@@ -1847,6 +2257,7 @@ client->>serveur: requête"></textarea>
     attachPreviewInteractions();
     loadState();
     renderParticipants();
+    renderDiagramsList();
     refreshWorkspaceToolbox();
     ensureSingleRootBlock();
     updateBlocklyZoomLabel();
