@@ -715,7 +715,8 @@ client->>serveur: requête"></textarea>
     }
 
     function parseMessageLine(line) {
-      const match = line.match(/^([A-Za-z_][\w]*)\s*(-->>|->>|-->|->|--\)|-\)|--x|-x)\s*([A-Za-z_][\w]*)\s*:\s*(.*)$/);
+//      const match = line.match(/^([A-Za-z_][\w]*)\s*(-->>|->>|-->|->|--\)|-\)|--x|-x)\s*([A-Za-z_][\w]*)\s*:\s*(.*)$/);
+      const match = line.match(/^([A-Za-z_]\w*)\s*(-->>|->>|-->|->|--[)]|-[)]|--x|-x)\s*([A-Za-z_]\w*)\s*:\s*(.*)$/);
       if (!match) return null;
       const [, from, arrow, to, text] = match;
       ensureParticipantRef(from);
