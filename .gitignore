@@ -13,3 +13,5 @@
 /examples/test-index-ts/node_modules
 /examples/test-compressioin-image/node_modules
 /examples/test-noise-generator/node_modules
+/examples/test-conceptor/node_modules
+/examples/test-conceptor/data
