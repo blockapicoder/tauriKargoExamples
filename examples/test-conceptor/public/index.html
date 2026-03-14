@@ -69,7 +69,8 @@
     .field input,
     .field select,
     button,
-    textarea {
+    textarea,
+    .toolbar-link {
       border: 1px solid var(--border);
       background: var(--panel);
       color: var(--text);
@@ -79,24 +80,35 @@
       min-width: 0;
     }
 
-    button {
+    button,
+    .toolbar-link {
       cursor: pointer;
       transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
       white-space: nowrap;
     }
 
-    button:hover {
+    button:hover,
+    .toolbar-link:hover {
       transform: translateY(-1px);
       border-color: #64748b;
     }
 
-    button.primary {
+    .toolbar-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+    }
+
+    button.primary,
+    .toolbar-link.primary {
       background: var(--accent2);
       color: white;
       border-color: #0284c7;
     }
 
-    button.secondary {
+    button.secondary,
+    .toolbar-link.secondary {
       background: #1e293b;
     }
 
@@ -499,6 +511,7 @@
     <div class="toolbar-controls">
       <button id="manageDiagramsBtn" class="secondary" type="button">Diagrammes</button>
       <button id="manageParticipantsBtn" class="secondary" type="button">Gérer éléments</button>
+      <a class="toolbar-link secondary" href="/explorer.html" target="_blank" rel="noopener">Dossier de stockage</a>
       <div class="toolbar-spacer"></div>
       <button id="tabBlockly" class="tab-btn active" type="button">Blockly</button>
       <button id="tabMermaid" class="tab-btn" type="button">Mermaid</button>
@@ -604,7 +617,6 @@ client->>serveur: requête"></textarea>
       </div>
     </div>
   </div>
-
   <script src="/index.js"></script>
 
 </body>

@@ -1,5 +1,4 @@
 
-    const STORAGE_KEY = 'blockly-mermaid-diagram-builder-v11';
     const ROOT_BLOCK_TYPES = ['seq_root', 'class_root'];
     const DEFAULT_SEQUENCE_NAME = 'Diagramme de séquence';
     const DEFAULT_CLASS_NAME = 'Diagramme de classe';
@@ -2097,22 +2096,6 @@
         }
 
         ensureDiagramCollection();
-
-        const state = {
-          diagrams: diagrams.map(diagram => ({
-            id: diagram.id,
-            name: diagram.name,
-            type: normalizeDiagramType(diagram.type),
-            participants: cloneParticipants(diagram.participants),
-            workspace: sanitizeSerializedWorkspace(diagram.workspace),
-            previewScale: Number(diagram.previewScale || 1) || 1,
-            source: String(diagram.source || '')
-          })),
-          activeDiagramId,
-          activeTab
-        };
-
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         updateEditorTitle();
 
         if (document.getElementById('diagramsDialog')?.classList.contains('open')) {
@@ -2123,32 +2106,14 @@
           scheduleRemoteSave();
         }
       } catch (error) {
-        console.warn('Sauvegarde locale impossible', error);
+        console.warn('Synchronisation d\'état impossible', error);
       }
     }
 
-    function loadState() {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const state = JSON.parse(raw);
-          diagrams = Array.isArray(state.diagrams) ? state.diagrams.map(diagram => ({
-            id: String(diagram?.id || makeDiagramId()),
-            name: String(diagram?.name || 'Diagramme'),
-            type: normalizeDiagramType(diagram?.type),
-            participants: cloneParticipants(diagram?.participants),
-            workspace: sanitizeSerializedWorkspace(diagram?.workspace),
-            previewScale: Number(diagram?.previewScale || 1) || 1,
-            source: String(diagram?.source || '')
-          })) : [];
-          activeDiagramId = typeof state.activeDiagramId === 'string' ? state.activeDiagramId : null;
-          activeTab = state.activeTab === 'mermaid' ? 'mermaid' : 'blockly';
-        }
-      } catch (error) {
-        console.warn('Chargement local impossible', error);
-      }
-
-      ensureDiagramCollection();
+    function resetStateFromServerOnly() {
+      diagrams = [];
+      activeDiagramId = null;
+      activeTab = 'blockly';
     }
 
     function setFieldValueIfPresent(block, fieldName, value) {
@@ -2299,17 +2264,15 @@
 
       ensureWorkspace();
       attachPreviewInteractions();
-      loadState();
+      resetStateFromServerOnly();
 
       try {
         const loadedRemote = await loadDiagramsFromServer().catch((error) => {
-          console.warn('Chargement distant impossible, repli sur l\'état local.', error);
+          console.warn('Chargement distant impossible.', error);
           return false;
         });
 
-        ensureDiagramCollection();
-
-        if (!loadedRemote && !getCurrentDiagram()) {
+        if (!loadedRemote) {
           ensureDiagramCollection();
         }
 

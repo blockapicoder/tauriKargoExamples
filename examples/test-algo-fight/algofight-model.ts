@@ -15,13 +15,16 @@ export const model = schema.createModel({
         position: { struct: "Position" },
         usine: { ref: ["Usine"] },
         cible: { optional: { ref: ["Drone", "Usine", "Energie", "Position", "Vie"] } },
-        joueur: { ref: ["Joueur"] }
+        joueur: { ref: ["Joueur"] },
+        energieCount:"number",
+        vieCount:"number"
     },
     Usine: {
         type: { union: ["Usine"] },
         position: { struct: "Position" },
         joueur: { optional: { ref: ["Joueur"] } },
-        technologie: { union: ["Population", "Vitesse", "Porte", "Transport", "Puissance", "Bouclier"] }
+        technologie: { union: ["Population", "Vitesse", "Porte", "Transport", "Puissance"] },
+        energieCount:"number"
     },
     Position: {
 
