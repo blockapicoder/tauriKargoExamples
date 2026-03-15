@@ -14,17 +14,28 @@ export const model = schema.createModel({
         type: { union: ["Drone"] },
         position: { struct: "Position" },
         usine: { ref: ["Usine"] },
-        cible: { optional: { ref: ["Drone", "Usine", "Energie", "Position", "Vie"] } },
+        cible: { optional: { struct: "Target" } },
         joueur: { ref: ["Joueur"] },
-        energieCount:"number",
-        vieCount:"number"
+        energieCount: "number",
+        vieCount: "number"
     },
     Usine: {
         type: { union: ["Usine"] },
         position: { struct: "Position" },
-        joueur: { optional: { ref: ["Joueur"] } },
-        technologie: { union: ["Population", "Vitesse", "Porte", "Transport", "Puissance"] },
-        energieCount:"number"
+        etat: { optional: { struct: "UsineEtat" } },
+        technologie: { union: ["Population", "Vitesse", "Porte", "Transport", "Puissance"] }
+    },
+    Target: {
+        cible: { ref: ["Drone", "Usine", "Energie", "Position", "Vie"] },
+        fireTime: "number"
+    },
+    UsineEtat: {
+        joueur: { ref: ["Joueur"] },
+        time: "number",
+        energieCount: "number",
+        newDrone: { optional: { ref: ["Drone"] } },
+        populationCount: "number"
+
     },
     Position: {
 

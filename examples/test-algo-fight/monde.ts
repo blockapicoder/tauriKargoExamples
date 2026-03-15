@@ -26,6 +26,7 @@ const RESSOURCE_RAYON = 5
 const USINE_DISTANCE_MIN = 100
 const RESSOURCE_DISTANCE_MIN = 35
 const FIRE_TIME = 1000
+const BUILD_TIME = 50
 const TRANSPORT_COUNT = 10
 type Joueur = Ref<typeof dataModel.def, "Joueur">
 type Drone = Ref<typeof dataModel.def, "Drone">
@@ -44,23 +45,17 @@ interface DroneMoveState {
     sy: number
     dep: number
 }
-interface DroneFireState {
-    type: 'fire'
-    time: number
-    ref: Drone
 
-}
 
 interface DroneWaitState {
     type: 'wait'
     ref: Drone
 
 }
-type DroneState = DroneMoveState | DroneFireState | DroneWaitState
+type DroneState = DroneMoveState | DroneWaitState
 interface UsineState {
     ref: Usine
-    currentDrone?: Drone
-    count: number
+
 
 }
 interface RessourceState {
@@ -72,33 +67,203 @@ function dist(p: Pos, q: Pos) {
     const dy = p.y - q.y
     return Math.sqrt(dx * dx + dy * dy)
 }
-
-export class Monde {
-    canvas!: HTMLCanvasElement
-    ctx!: CanvasRenderingContext2D
-    robot1!: RobotTypescriptFile
-    robot2!: RobotTypescriptFile
-
-    sortie = ""
-    client!: TauriKargoClient
-
-    constructor() {
-        this.client = createClient()
-    }
+export class GestionMonde {
     droneStates: DroneState[] = []
     usineStates: UsineState[] = []
     ressourceStates: RessourceState[] = []
-    joueurA!: Ref<typeof dataModel.def, "Joueur">
-    joueurB!: Ref<typeof dataModel.def, "Joueur">
-    loop() {
-        this.droneStates = this.droneStates.filter((s) => !!dataModel.map[(s.ref.ref)])
-        for (let idx = 0; idx < this.droneStates.length; idx++) {
-            this.droneStates[idx] = this.process(this.droneStates[idx])
+    joueurA: Joueur
+    joueurB: Joueur
+    constructor() {
+        dataModel.map = {}
+        dataModel.types = {}
+        dataModel.idForModelElement = new Map()
+        dataModel.idx = 0
+        this.joueurA = dataModel.createValue("Joueur", { type: "Joueur" })
+        this.joueurB = dataModel.createValue("Joueur", { type: "Joueur" })
+    }
+    populationCount(j: Joueur, u: Usine) {
+        let populationCount = 0
+        for (const d of dataModel.getRefs("Drone")) {
+            const dv = d.getValue()
+            if (dv.joueur === j && dv.usine === u) {
+                populationCount++
+            }
         }
+        return populationCount
+    }
+    createRessources(w: number, h: number, createFunction: (pos: Pos, energieCount: number, vieCount: number) => boolean) {
+        let gen = true
+        do {
+            const energies = dataModel.getRefs("Energie").map((ref) => ref.getValue())
+            const vies = dataModel.getRefs("Vie").map((ref) => ref.getValue())
+            const usines = dataModel.getRefs("Usine").map((ref) => ref.getValue())
+            let x = Math.random() * w
+            let y = Math.random() * h
+            const pos: Pos = { x: x, y: y }
+            if (vies.every((u) => {
+                return dist(pos, u.position) >= RESSOURCE_DISTANCE_MIN
+            }) && energies.every((u) => {
+                return dist(pos, u.position) >= RESSOURCE_DISTANCE_MIN
+            }) && usines.every((u) => {
+                return dist(pos, u.position) >= RESSOURCE_DISTANCE_MIN
+            })) {
+                gen = createFunction(pos, energies.length, vies.length)
+            }
+
+
+        } while (gen)
+
+    }
+    createWorld(w: number, h: number) {
+
+        let gen = true
+        do {
+            const lst = dataModel.getRefs("Usine").map((ref) => ref.getValue())
+            let x = Math.random() * w
+            let y = Math.random() * h
+            const pos: Pos = { x: x, y: y }
+            if (lst.every((u) => {
+                return dist(pos, u.position) >= USINE_DISTANCE_MIN
+            })) {
+                let ip = Math.trunc(Math.random() * (pouvoirs.length - 1))
+
+                const u = dataModel.createValue("Usine", {
+                    position: pos,
+                    technologie: pouvoirs[ip],
+                    type: "Usine"
+
+
+                })
+                this.usineStates.push({
+                    ref: u
+                })
+            }
+
+            gen = lst.length < USINE_COUNT
+        } while (gen)
+        this.createRessources(w, h, (pos, energieCount, vieCount) => {
+            const r = dataModel.createValue("Energie", {
+                position: pos,
+                type: "Energie"
+            })
+            this.ressourceStates.push({
+                ref: r
+
+            })
+            return (energieCount < ENERGIE_COUNT)
+        })
+        this.createRessources(w, h, (pos, energieCount, vieCount) => {
+            const r = dataModel.createValue("Vie", {
+                position: pos,
+                type: "Vie"
+            })
+            this.ressourceStates.push({
+                ref: r
+            })
+            return (vieCount < VIE_COUNT)
+        })
+
+        this.joueurA = dataModel.createValue("Joueur", { type: "Joueur" });
+        this.joueurB = dataModel.createValue("Joueur", { type: "Joueur" });
+        const lst = dataModel.getRefs("Usine")
+        let usineJoueurA = lst[0]
+        let usineJoueurB = lst[1]
+        let distUsine = dist(usineJoueurA.getValue().position, usineJoueurB.getValue().position)
+        for (let i = 0; i < lst.length; i++) {
+            for (let j = i + 1; j < lst.length; j++) {
+                const tmpUsineJoueurA = lst[i]
+                const tmpUsineJoueurB = lst[j]
+                const tmpDistUsine = dist(tmpUsineJoueurA.getValue().position, tmpUsineJoueurB.getValue().position)
+                if (tmpDistUsine > distUsine) {
+                    distUsine = tmpDistUsine
+                    usineJoueurA = tmpUsineJoueurA
+                    usineJoueurB = tmpUsineJoueurB
+
+                }
+            }
+        }
+        usineJoueurA.getValue().etat = { joueur: this.joueurA, time: BUILD_TIME, energieCount: 0, populationCount: 0 }
+        usineJoueurB.getValue().etat = { joueur: this.joueurB, time: BUILD_TIME, energieCount: 0, populationCount: 0 }
+
+
+
 
 
     }
+    getDronePopulation(joueur: Joueur) {
+        let n = dataModel.getRefs("Usine").filter((r) => {
+            const v = r.getValue()
+            return v.technologie === "Population" && v.etat && v.etat.joueur === joueur
+        }).length + 5
+        return n
+    }
+    getDroneSpeed(joueur: Joueur) {
+        let n = dataModel.getRefs("Usine").filter((r) => {
+            const v = r.getValue()
+            return v.technologie === "Vitesse" && v.etat && v.etat.joueur === joueur
+        }).length + 1
+        return n * 2
+    }
+    getDroneRange(joueur: Joueur) {
+        let n = dataModel.getRefs("Usine").filter((r) => {
+            const v = r.getValue()
+            return v.technologie === "Porte" && v.etat && v.etat.joueur === joueur
+        }).length + 1
+        return n * 10
+    }
+    getDronePower(joueur: Joueur) {
+        let n = dataModel.getRefs("Usine").filter((r) => {
+            const v = r.getValue()
+            return v.technologie === "Puissance" && v.etat && v.etat.joueur === joueur
+        }).length + 1
+        return n
+    }
+    getDroneTransport(joueur: Joueur) {
+        let n = dataModel.getRefs("Usine").filter((r) => {
+            const v = r.getValue()
+            return v.technologie === "Transport" && v.etat && v.etat.joueur === joueur
+        }).length + TRANSPORT_COUNT
+        return n
+    }
+    initDroneState(joueur: Joueur, drone: Drone, target: Target) {
+        const droneValue = drone.getValue()
+        const p = target.getValue().position
+        const q = droneValue.position
+        const dx = p.x - q.x
+        const dy = p.y - q.y
+        const d = Math.sqrt(dx * dx + dy * dy) - this.getDroneRange(joueur)
+        let idx = this.droneStates.findIndex((ds) => ds.ref === drone)
+        if (!idx) {
+            return false
+        }
+        if (droneValue.joueur === joueur) {
+            return false
+        }
+        let ds: DroneState = this.droneStates[idx]
+        if (droneValue.cible && droneValue.cible.fireTime > 0) {
+            return false
+        }
 
+        const speed = this.getDroneSpeed(joueur)
+        droneValue.cible = { cible: target, fireTime: 0 }
+        const usineValue = droneValue.usine.getValue()
+        if (usineValue.etat && usineValue.etat.newDrone === drone) {
+            usineValue.etat.newDrone = undefined
+        }
+        ds = {
+            type: 'move',
+            ref: drone,
+            refTarget: target,
+            distance: d,
+            sx: speed * dx / d,
+            sy: speed * dy / d,
+            dep: speed,
+            target: p
+        }
+        this.droneStates[idx] = ds
+        return true
+
+    }
     fire(ds: DroneMoveState): DroneState {
         const value = ds.ref.getValue()
         const target = ds.refTarget.getValue()
@@ -109,6 +274,7 @@ export class Monde {
         const d = Math.sqrt(dx * dx + dy * dy)
         const range = this.getDroneRange(value.joueur)
         if (d >= range) {
+            value.cible = undefined
             return { type: "wait", ref: ds.ref }
         }
         if (target.type === "Energie" || target.type === "Vie") {
@@ -120,7 +286,8 @@ export class Monde {
                 return { type: "wait", ref: ds.ref }
             }
             target.proprietaire = ds.ref
-            return { type: 'fire', time: FIRE_TIME, ref: ds.ref }
+            value.cible = { cible: ds.refTarget, fireTime: FIRE_TIME }
+            return ds
         }
         if (target.type === "Drone") {
             let puissance = this.getDronePower(value.joueur)
@@ -144,27 +311,41 @@ export class Monde {
 
             }
             if (target.vieCount <= 0) {
+                const usine = target.usine.getValue()
+                if (usine.etat && usine.etat.joueur === target.joueur) {
+                    usine.etat.populationCount--
+                }
                 delete dataModel.map[ds.refTarget.ref]
             }
-            return { type: 'fire', time: FIRE_TIME, ref: ds.ref }
+            value.cible = { cible: ds.refTarget, fireTime: FIRE_TIME }
+            return ds
         }
         if (target.type === "Usine") {
             let puissance = this.getDronePower(value.joueur)
             const tmpRef: any = ds.refTarget
-            if (target.joueur === value.joueur || !target.joueur) {
+            if (!target.etat || target.etat.joueur === value.joueur) {
+                let energieCount = 0
                 for (const r of this.ressourceStates) {
                     const v = r.ref.getValue()
                     if (v.type === "Energie" && v.proprietaire === ds.ref && puissance > 0) {
 
                         v.proprietaire = tmpRef
                         value.energieCount--;
-                        target.energieCount++;
+                        energieCount++;
                         puissance--;
                     }
                 }
-                target.joueur = value.joueur
-            } else if (target.joueur) {
+                if (energieCount) {
+                    if (target.etat) {
+                        target.etat.energieCount += energieCount
+                    } else {
+                        target.etat = { joueur: value.joueur, time: BUILD_TIME, energieCount: energieCount, populationCount: this.populationCount(value.joueur, tmpRef) }
+                    }
+                }
+
+            } else if (target.etat) {
                 let total = 0;
+                let energieCount = 0
                 for (const r of this.ressourceStates) {
                     const v = r.ref.getValue()
                     if (v.type === "Energie" && v.proprietaire === tmpRef) {
@@ -172,6 +353,7 @@ export class Monde {
 
                             v.proprietaire = undefined
                             value.energieCount--;
+                            energieCount++;
                             puissance--;
                         } else {
                             total++;
@@ -179,139 +361,96 @@ export class Monde {
                     }
                 }
                 if (total === 0) {
-                    target.joueur = undefined
+                    target.etat = { joueur: value.joueur, time: BUILD_TIME, energieCount: energieCount, populationCount: this.populationCount(value.joueur, tmpRef) }
+
+                } else {
+                    if (target.etat) target.etat.energieCount = total
                 }
-                target.energieCount = total
+
+
+                value.cible = { cible: ds.refTarget, fireTime: FIRE_TIME }
 
             }
         }
         return { type: "wait", ref: ds.ref }
 
     }
-
-    process(droneState: DroneState): DroneState {
-        if (droneState.type !== "move") {
-            if (droneState.type === "fire") {
-                droneState.time--;
-                if (droneState.time <= 0) {
-                    return { type: "wait", ref: droneState.ref }
-                }
+    processUsine(usineState: UsineState) {
+        const v = usineState.ref.getValue()
+        if (v.etat) {
+            if (v.etat.newDrone) {
+                return
             }
+            if (v.etat.time === 0) {
+                if (v.etat.populationCount < this.getDronePopulation(v.etat.joueur)) {
+                    v.etat.newDrone = dataModel.createValue("Drone", { type: "Drone", energieCount: 0, vieCount: 0, joueur: v.etat.joueur, position: v.position, usine: usineState.ref })
+                    v.etat.populationCount++
+                }
+                v.etat.time = BUILD_TIME
+                return
+            }
+            v.etat.time--
+        }
+
+    }
+    processUsines() {
+        for (const u of this.usineStates) {
+            this.processUsine(u)
+        }
+    }
+
+    processDrone(droneState: DroneState): DroneState {
+        const droneValue = droneState.ref.getValue()
+        if (droneState.type === "wait") {
+            return droneState
+        }
+        if (droneValue.cible && droneValue.cible.fireTime > 0) {
+            droneValue.cible.fireTime--
+
+            if (droneValue.cible.fireTime <= 0) {
+                droneValue.cible = undefined
+                return { type: "wait", ref: droneState.ref }
+            }
+
             return droneState
         }
         droneState.distance = droneState.distance - droneState.dep
         if (droneState.distance < 0) {
-            droneState.ref.getValue().position = droneState.target
+            droneValue.position = droneState.target
             return this.fire(droneState)
         }
-        const p = droneState.ref.getValue().position
+        const p = droneValue.position
         p.x += droneState.sx
         p.y += droneState.sy
         return droneState
 
     }
-
-    createRessources(w: number, h: number, createFunction: (pos: Pos) => void) {
-        let gen = true
-        do {
-            const energies = dataModel.getRefs("Energie").map((ref) => ref.getValue())
-            const vies = dataModel.getRefs("Vie").map((ref) => ref.getValue())
-            const usines = dataModel.getRefs("Usine").map((ref) => ref.getValue())
-            let x = Math.random() * w
-            let y = Math.random() * h
-            const pos: Pos = { x: x, y: y }
-            if (vies.every((u) => {
-                return dist(pos, u.position) >= RESSOURCE_DISTANCE_MIN
-            }) && energies.every((u) => {
-                return dist(pos, u.position) >= RESSOURCE_DISTANCE_MIN
-            }) && usines.every((u) => {
-                return dist(pos, u.position) >= RESSOURCE_DISTANCE_MIN
-            })) {
-                createFunction(pos)
-            }
-
-            gen = (energies.length < ENERGIE_COUNT) && (vies.length < VIE_COUNT)
-        } while (gen)
-
-    }
-
-    clearWorld(w: number, h: number) {
-        dataModel.map = {}
-        dataModel.types = {}
-        dataModel.idForModelElement = new Map()
-        dataModel.idx = 0
-        let gen = true
-        do {
-            const lst = dataModel.getRefs("Usine").map((ref) => ref.getValue())
-            let x = Math.random() * w
-            let y = Math.random() * h
-            const pos: Pos = { x: x, y: y }
-            if (lst.every((u) => {
-                return dist(pos, u.position) >= USINE_DISTANCE_MIN
-            })) {
-                let ip = Math.trunc(Math.random() * (pouvoirs.length - 1))
-
-                const u = dataModel.createValue("Usine", {
-                    position: pos,
-                    technologie: pouvoirs[ip],
-                    type: "Usine",
-                    energieCount: 0
-                })
-                this.usineStates.push({
-                    count: 0,
-                    ref: u
-                })
-            }
-
-            gen = lst.length < USINE_COUNT
-        } while (gen)
-        this.createRessources(w, h, (pos) => {
-            const r = dataModel.createValue("Energie", {
-                position: pos,
-                type: "Energie"
-            })
-            this.ressourceStates.push({
-                ref: r
-
-            })
-        })
-        this.createRessources(w, h, (pos) => {
-            const r = dataModel.createValue("Vie", {
-                position: pos,
-                type: "Vie"
-            })
-            this.ressourceStates.push({
-                ref: r
-            })
-        })
-
-        this.joueurA = dataModel.createValue("Joueur", { type: "Joueur" });
-        this.joueurB = dataModel.createValue("Joueur", { type: "Joueur" });
-        const lst = dataModel.getRefs("Usine")
-        let usineJoueurA = lst[0]
-        let usineJoueurB = lst[1]
-        let distUsine = dist(usineJoueurA.getValue().position, usineJoueurB.getValue().position)
-        for (let i = 0; i < lst.length; i++) {
-            for (let j = i + 1; j < lst.length; j++) {
-                const tmpUsineJoueurA = lst[i]
-                const tmpUsineJoueurB = lst[j]
-                const tmpDistUsine = dist(tmpUsineJoueurA.getValue().position, tmpUsineJoueurB.getValue().position)
-                if (tmpDistUsine > distUsine) {
-                    distUsine = tmpDistUsine
-                    usineJoueurA = tmpUsineJoueurA
-                    usineJoueurB = tmpUsineJoueurB
-
-                }
-            }
+    processDrones() {
+        this.droneStates = this.droneStates.filter((s) => !!dataModel.map[(s.ref.ref)])
+        for (let idx = 0; idx < this.droneStates.length; idx++) {
+            this.droneStates[idx] = this.processDrone(this.droneStates[idx])
         }
-        usineJoueurA.getValue().joueur = this.joueurA
-        usineJoueurB.getValue().joueur = this.joueurB
-
-
-
-
-
     }
+}
+
+export class Monde {
+    canvas!: HTMLCanvasElement
+    ctx!: CanvasRenderingContext2D
+    robot1!: RobotTypescriptFile
+    robot2!: RobotTypescriptFile
+
+    sortie = ""
+    client!: TauriKargoClient
+    gestionMonde!: GestionMonde
+
+    constructor() {
+        this.client = createClient()
+    }
+
+
+
+
+
     fitCanvasToParent() {
         const dpr = window.devicePixelRatio || 1;
         const w = Math.max(1, this.canvas.clientWidth);
@@ -352,17 +491,17 @@ export class Monde {
         this.ctx.rect(0, 0, w, h)
 
         this.ctx.stroke();
-        this.clearWorld(w, h)
+
         this.ctx.beginPath();
 
 
-        for (const s of this.usineStates) {
+        for (const s of this.gestionMonde.usineStates) {
             const u = s.ref.getValue()
             this.ctx.beginPath();
-            if (u.joueur === this.joueurA) {
+            if (u.etat && u.etat.joueur === this.gestionMonde.joueurA) {
                 this.ctx.strokeStyle = "blue"
             } else
-                if (u.joueur === this.joueurB) {
+                if (u.etat && u.etat.joueur === this.gestionMonde.joueurB) {
                     this.ctx.strokeStyle = "red"
                 } else {
                     this.ctx.strokeStyle = "green"
@@ -373,7 +512,7 @@ export class Monde {
             this.ctx.stroke();
         }
 
-        for (const s of this.ressourceStates) {
+        for (const s of this.gestionMonde.ressourceStates) {
             const u = s.ref.getValue()
             if (!u.proprietaire) {
 
@@ -388,61 +527,9 @@ export class Monde {
     }
     initCanvas() {
         this.ctx = this.canvas.getContext("2d")!
-        this.afficher()
-    }
-    getDroneSpeed(joueur: Joueur) {
-        let n = dataModel.getRefs("Usine").filter((r) => {
-            const v = r.getValue()
-            return v.technologie === "Vitesse" && v.joueur === joueur
-        }).length + 1
-        return n * 2
-    }
-    getDroneRange(joueur: Joueur) {
-        let n = dataModel.getRefs("Usine").filter((r) => {
-            const v = r.getValue()
-            return v.technologie === "Porte" && v.joueur === joueur
-        }).length + 1
-        return n * 10
-    }
-    getDronePower(joueur: Joueur) {
-        let n = dataModel.getRefs("Usine").filter((r) => {
-            const v = r.getValue()
-            return v.technologie === "Puissance" && v.joueur === joueur
-        }).length + 1
-        return n
-    }
-    getDroneTransport(joueur: Joueur) {
-        let n = dataModel.getRefs("Usine").filter((r) => {
-            const v = r.getValue()
-            return v.technologie === "Transport" && v.joueur === joueur
-        }).length + TRANSPORT_COUNT
-        return n
-    }
-    initDroneState(joueur: Joueur, drone: Drone, target: Target) {
-        const p = target.getValue().position
-        const q = drone.getValue().position
-        const dx = p.x - q.x
-        const dy = p.y - q.y
-        const d = Math.sqrt(dx * dx + dy * dy) - this.getDroneRange(joueur)
-        let idx = this.droneStates.findIndex((ds) => ds.ref === drone)
-        if (!idx) {
-            return
-        }
-
-        const speed = this.getDroneSpeed(joueur)
-        const ds: DroneState = {
-            type: 'move',
-            ref: drone,
-            refTarget: target,
-            distance: d,
-            sx: speed * dx / d,
-            sy: speed * dy / d,
-            dep: speed,
-            target: p
-        }
-        this.droneStates[idx] = ds
 
     }
+
 
     async init(div: HTMLDivElement) {
 
@@ -450,6 +537,10 @@ export class Monde {
             mondeContexte.workerA.terminate()
             mondeContexte.workerB.terminate()
         }
+        this.fitCanvasToParent()
+        const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+        this.gestionMonde = new GestionMonde()
+        this.gestionMonde.createWorld(w, h)
 
 
         const typescriptSourceRobot1: string = await this.robot1.getSource()
@@ -463,14 +554,15 @@ export class Monde {
             }
 
             dataModel.process(mondeContexte.workerA, (action) => {
-                this.initDroneState(this.joueurA, action.value.mobile, action.value.target)
-                return true
-            }, this.joueurA)
+                return this.gestionMonde.initDroneState(this.gestionMonde.joueurA, action.value.mobile, action.value.target)
+
+            }, this.gestionMonde.joueurA)
             dataModel.process(mondeContexte.workerB, (action) => {
-                this.initDroneState(this.joueurB, action.value.mobile, action.value.target)
-                return false
-            }, this.joueurB)
+                return this.gestionMonde.initDroneState(this.gestionMonde.joueurB, action.value.mobile, action.value.target)
+
+            }, this.gestionMonde.joueurB)
         }
+        this.afficher()
 
     }
 
