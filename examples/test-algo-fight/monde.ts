@@ -85,7 +85,7 @@ export class GestionMonde {
         let populationCount = 0
         for (const d of dataModel.getRefs("Drone")) {
             const dv = d.getValue()
-            if (dv.joueur === j && dv.usine === u) {
+            if (dv.joueur.ref === j.ref && dv.usine.ref === u.ref) {
                 populationCount++
             }
         }
@@ -193,35 +193,35 @@ export class GestionMonde {
     getDronePopulation(joueur: Joueur) {
         let n = dataModel.getRefs("Usine").filter((r) => {
             const v = r.getValue()
-            return v.technologie === "Population" && v.etat && v.etat.joueur === joueur
+            return v.technologie === "Population" && v.etat && v.etat.joueur.ref === joueur.ref
         }).length + 5
         return n
     }
     getDroneSpeed(joueur: Joueur) {
         let n = dataModel.getRefs("Usine").filter((r) => {
             const v = r.getValue()
-            return v.technologie === "Vitesse" && v.etat && v.etat.joueur === joueur
+            return v.technologie === "Vitesse" && v.etat && v.etat.joueur.ref === joueur.ref
         }).length + 1
         return n * 2
     }
     getDroneRange(joueur: Joueur) {
         let n = dataModel.getRefs("Usine").filter((r) => {
             const v = r.getValue()
-            return v.technologie === "Porte" && v.etat && v.etat.joueur === joueur
+            return v.technologie === "Porte" && v.etat && v.etat.joueur.ref === joueur.ref
         }).length + 1
         return n * 10
     }
     getDronePower(joueur: Joueur) {
         let n = dataModel.getRefs("Usine").filter((r) => {
             const v = r.getValue()
-            return v.technologie === "Puissance" && v.etat && v.etat.joueur === joueur
+            return v.technologie === "Puissance" && v.etat && v.etat.joueur.ref === joueur.ref
         }).length + 1
         return n
     }
     getDroneTransport(joueur: Joueur) {
         let n = dataModel.getRefs("Usine").filter((r) => {
             const v = r.getValue()
-            return v.technologie === "Transport" && v.etat && v.etat.joueur === joueur
+            return v.technologie === "Transport" && v.etat && v.etat.joueur.ref === joueur.ref
         }).length + TRANSPORT_COUNT
         return n
     }
@@ -232,11 +232,11 @@ export class GestionMonde {
         const dx = p.x - q.x
         const dy = p.y - q.y
         const d = Math.sqrt(dx * dx + dy * dy) - this.getDroneRange(joueur)
-        let idx = this.droneStates.findIndex((ds) => ds.ref === drone)
+        let idx = this.droneStates.findIndex((ds) => ds.ref.ref === drone.ref)
         if (!idx) {
             return false
         }
-        if (droneValue.joueur === joueur) {
+        if (droneValue.joueur.ref === joueur.ref) {
             return false
         }
         let ds: DroneState = this.droneStates[idx]
@@ -247,7 +247,7 @@ export class GestionMonde {
         const speed = this.getDroneSpeed(joueur)
         droneValue.cible = { cible: target, fireTime: 0 }
         const usineValue = droneValue.usine.getValue()
-        if (usineValue.etat && usineValue.etat.newDrone === drone) {
+        if (usineValue.etat && usineValue.etat.newDrone?.ref === drone.ref) {
             usineValue.etat.newDrone = undefined
         }
         ds = {
@@ -297,12 +297,12 @@ export class GestionMonde {
                     break;
                 }
                 const v = r.ref.getValue()
-                if (v.type === "Vie" && puissance > 0 && v.proprietaire === ds.refTarget && target.vieCount > 0) {
+                if (v.type === "Vie" && puissance > 0 && v.proprietaire?.ref === ds.refTarget.ref && target.vieCount > 0) {
                     v.proprietaire = undefined
                     puissance--;
                     target.vieCount--;
                 }
-                if (v.type === "Energie" && v.proprietaire === ds.ref && removeEnergie) {
+                if (v.type === "Energie" && v.proprietaire?.ref === ds.ref.ref && removeEnergie) {
                     removeEnergie = false;
                     v.proprietaire = undefined
                     value.energieCount--;
@@ -312,7 +312,7 @@ export class GestionMonde {
             }
             if (target.vieCount <= 0) {
                 const usine = target.usine.getValue()
-                if (usine.etat && usine.etat.joueur === target.joueur) {
+                if (usine.etat && usine.etat.joueur.ref === target.joueur.ref) {
                     usine.etat.populationCount--
                 }
                 delete dataModel.map[ds.refTarget.ref]
@@ -323,11 +323,11 @@ export class GestionMonde {
         if (target.type === "Usine") {
             let puissance = this.getDronePower(value.joueur)
             const tmpRef: any = ds.refTarget
-            if (!target.etat || target.etat.joueur === value.joueur) {
+            if (!target.etat || target.etat.joueur.ref === value.joueur.ref) {
                 let energieCount = 0
                 for (const r of this.ressourceStates) {
                     const v = r.ref.getValue()
-                    if (v.type === "Energie" && v.proprietaire === ds.ref && puissance > 0) {
+                    if (v.type === "Energie" && v.proprietaire?.ref === ds.ref.ref && puissance > 0) {
 
                         v.proprietaire = tmpRef
                         value.energieCount--;
@@ -348,7 +348,7 @@ export class GestionMonde {
                 let energieCount = 0
                 for (const r of this.ressourceStates) {
                     const v = r.ref.getValue()
-                    if (v.type === "Energie" && v.proprietaire === tmpRef) {
+                    if (v.type === "Energie" && v.proprietaire?.ref === tmpRef.ref) {
                         if (puissance > 0) {
 
                             v.proprietaire = undefined

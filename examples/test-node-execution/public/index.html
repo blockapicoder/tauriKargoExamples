@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NodePad</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <header class="topbar panel-shell">
+      <div class="brand-name">NodePad</div>
+      <div id="statusBox" class="topbar-status" aria-live="polite">Initialisation...</div>
+      <button id="executeBtn" class="primary-btn">Exécuter</button>
+    </header>
+
+    <main class="layout">
+      <section class="panel editor-panel">
+        <div class="editor-header">
+          <h2>Script TypeScript</h2>
+          <span id="filesInfo" class="meta-chip"></span>
+        </div>
+        <div id="tsEditor" class="editor"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/typescript/5.6.3/typescript.min.js"></script>
+  <script>
+    window.require = { paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs' } };
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

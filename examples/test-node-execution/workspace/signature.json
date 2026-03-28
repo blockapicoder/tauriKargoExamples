@@ -1,0 +1,16 @@
+{
+  "exportMode": "exports.named",
+  "exportName": "api",
+  "functionName": "main",
+  "params": [
+    {
+      "name": "name",
+      "type": "string"
+    },
+    {
+      "name": "times",
+      "type": "number"
+    }
+  ],
+  "returnType": "Promise<string>"
+}

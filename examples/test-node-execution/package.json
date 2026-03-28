@@ -1,0 +1,13 @@
+{
+  "name": "express-ts-runtime-editor",
+  "version": "1.0.0",
+  "description": "Express app with Monaco editor, front-side TypeScript transpilation, save and execute APIs.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
