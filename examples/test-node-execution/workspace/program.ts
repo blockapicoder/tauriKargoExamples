@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
-console.log("test affichage")
+console.log("test affichage trop cool ")
+console.log( fs.readdirSync("."))
 async function main(): Promise<string> {
   const result = {
     fileExists: fs.existsSync(__filename),

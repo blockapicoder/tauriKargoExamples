@@ -8,6 +8,6 @@
   },
   "dependencies": {
     "express": "^4.21.2",
-    "tauri-kargo-tools": "^0.2.9"
+    "tauri-kargo-tools": "^0.3.7"
   }
 }

@@ -1,9 +1,11 @@
 
 import * as vm from "./luxlang-model"
+
+//import { parse } from  "./generated-parser"
 import { parse } from "./parser"
 import * as cm from "./codemirror-module"
 import { defineVue, boot } from "./node_modules/tauri-kargo-tools/src/vue"
-import { TauriKargoClient, createClient } from "./node_modules/tauri-kargo-tools/src/api"
+import { TauriKargoClient, createClient } from "./node_modules/tauri-kargo-tools/src/api.js"
 import { compileProgram } from "./luxlang-compile"
 
 
