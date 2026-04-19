@@ -410,6 +410,9 @@ export class PagePrincpal {
 
         return r
     }
+    spiCurve() {
+        window.location.href="./spi-test.html"
+    }
 
 
 
@@ -424,6 +427,7 @@ defineVue(PagePrincpal, {
         { kind: "bootVue", factory: "planeteNavigation", label: "titrePlaneteNavigation", width: "20%" },
         { kind: "bootVue", factory: "trajectoireEditeur", label: "titreTrajectoireEditeur", width: "20%" },
         { kind: "bootVue", factory: "trajectoireAnimateur", label: "titreTrajectoireAnimateur", width: "20%" },
+        {  kind:"staticButton" , label:"Spi curve" , action:"spiCurve" }
     ]
 })
 boot(new PagePrincpal())

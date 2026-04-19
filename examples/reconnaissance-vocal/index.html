@@ -1,0 +1,33 @@
+<button id="start">Parler</button>
+<div id="out"></div>
+
+<script>
+  const SpeechRecognition =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    document.getElementById("out").textContent =
+      "Reconnaissance vocale non supportée par ce navigateur.";
+  } else {
+    const recognition = new SpeechRecognition();
+    recognition.lang = "fr-FR";
+    recognition.continuous = false;
+    recognition.interimResults = true;
+
+    recognition.onresult = (event) => {
+      let text = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        text += event.results[i][0].transcript;
+      }
+      document.getElementById("out").textContent = text;
+    };
+
+    recognition.onerror = (e) => {
+      document.getElementById("out").textContent = "Erreur : " + e.error;
+    };
+
+    document.getElementById("start").onclick = () => {
+      recognition.start();
+    };
+  }
+</script>

@@ -21,7 +21,7 @@ export interface IfRet { type: 'ifRet', if: Expr, then: Expr }
 
 export interface SetVar { type: 'setLocal' | 'setGlobal', var: number, value: Expr }
 
-export interface Fun { code: (SetVar | IfRet | Call)[], ret: Expr   }
+export interface Fun {numArg:number, code: (SetVar | IfRet | Call)[], ret: Expr   }
 export type Prog = (Fun)[]
 
 

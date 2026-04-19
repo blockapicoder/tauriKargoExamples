@@ -617,8 +617,9 @@ function resolveProgram(lowered: LoweredStmt[], knownPrims: Set<string>, globalI
                 }
                 throw new Error("Unknown instruction: " + JSON.stringify(ins));
             });
-
+            
             out.push({
+                numArg:st.params.length,
                 code,
                 ret: resolveExpr(st.ret, locals) as Expr,
             });

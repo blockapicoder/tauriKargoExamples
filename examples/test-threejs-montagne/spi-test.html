@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Interpolation SPI avec matrice de poids</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      min-height: 100vh;
+      background: #111;
+      color: #f5f5f5;
+    }
+    .matrix-panel {
+      width: 300px;
+      padding: 20px;
+      box-sizing: border-box;
+      border-right: 1px solid #333;
+      background: #141414;
+      overflow: auto;
+    }
+    .matrix-panel h2 {
+      margin: 0 0 14px;
+      font-size: 1.2rem;
+    }
+    .matrix-table {
+      font-size: 0.8rem;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    .matrix-table th, .matrix-table td {
+      padding: 4px 6px;
+      text-align: center;
+      border: 1px solid #444;
+      background: #222;
+      color: #f5f5f5;
+    }
+    .matrix-table th {
+      background: #333;
+      font-weight: bold;
+    }
+    .matrix-table .source-cell {
+      background: #2c5a2c;
+    }
+    .matrix-table .target-cell {
+      background: #5a2c2c;
+    }
+    .viewer {
+      flex: 1;
+      position: relative;
+      background: #0c0c0c;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .control-panel {
+      width: 300px;
+      padding: 20px;
+      box-sizing: border-box;
+      border-left: 1px solid #333;
+      background: #141414;
+      overflow: auto;
+    }
+    .control-panel h2 {
+      margin: 0 0 14px;
+      font-size: 1.2rem;
+    }
+    .control-panel label {
+      display: block;
+      margin: 8px 0 4px;
+    }
+    .control-panel select, .control-panel input, .control-panel button {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 8px;
+      background: #222;
+      color: #f5f5f5;
+      border: 1px solid #444;
+      border-radius: 4px;
+    }
+    .control-panel button {
+      background: #444;
+      cursor: pointer;
+    }
+    .control-panel button:hover {
+      background: #555;
+    }
+    .selected-point {
+      background: #222;
+      padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+    .hidden {
+      display: none;
+    }
+    .point-coords {
+      font-size: 0.9rem;
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="matrix-panel">
+    <h2>Matrice de poids</h2>
+    <div id="matrix-container"></div>
+  </div>
+
+  <div class="viewer">
+    <canvas id="curveCanvas" width="800" height="600"></canvas>
+  </div>
+
+  <div class="control-panel">
+    <h2>Contrôles</h2>
+
+    <label for="mode-select">Mode d'interpolation:</label>
+    <select id="mode-select">
+      <option value="SIN">SIN</option>
+      <option value="DP">DP</option>
+      <option value="RDP">RDP</option>
+    </select>
+
+    <label for="min-x">X minimum:</label>
+    <input type="number" id="min-x" value="-10" step="1">
+
+    <label for="max-x">X maximum:</label>
+    <input type="number" id="max-x" value="10" step="1">
+
+    <button id="add-point">Ajouter un point</button>
+    <button id="reset-points">Réinitialiser</button>
+
+    <div id="selected-point" class="selected-point hidden">
+      <div id="point-coords"></div>
+      <label for="selected-w">Poids w:</label>
+      <input type="number" id="selected-w" step="0.1" value="1" min="0.01">
+      <button id="delete-selected-point">Supprimer ce point</button>
+    </div>
+  </div>
+
+
+  <script src="./spi-test" type="module"></script>
+</body>
+</html>

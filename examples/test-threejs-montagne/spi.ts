@@ -1,13 +1,19 @@
 import * as THREE from 'three';
 
 
-export type TypeFonction = "DP"|"RDP"|"SIN"
+export type TypeFonction = "DP" | "RDP" | "SIN"
 // Types (compatibles)
 export interface PointFeature<T> {
     value: T;
+    w?: number[],
     y: number;
 }
-
+function w<T>(p: PointFeature<T>, i: number) {
+    if (p.w) {
+        return p.w[i] ?? 1
+    }
+    return 1
+}
 // Distance euclidienne au carré dans R^2
 export function distance(a: THREE.Vector2, b: THREE.Vector2): number {
     let d = a.distanceToSquared(b);
@@ -16,25 +22,25 @@ export function distance(a: THREE.Vector2, b: THREE.Vector2): number {
 
 // Outils présents dans ton fichier (conservés pour compatibilité)
 function dirFromLonLat(lon: number, lat: number): THREE.Vector3 {
-  const cl = Math.cos(lat);
-  return new THREE.Vector3(Math.cos(lon) * cl, Math.sin(lat), Math.sin(lon) * cl).normalize();
+    const cl = Math.cos(lat);
+    return new THREE.Vector3(Math.cos(lon) * cl, Math.sin(lat), Math.sin(lon) * cl).normalize();
 }
 function DS(a: THREE.Vector2, b: THREE.Vector2) {
     return dirFromLonLat(a.x, a.y).distanceToSquared(dirFromLonLat(b.x, b.y))
 }
-export function creerFunction<T>( type:TypeFonction ,points: PointFeature<T>[],D:(a: T, b:T)=>number ): (p:T) => number {
-  
-    if (type ==="SIN") {
-        return creerFunctionSinus(points,D)
+export function creerFunction<T>(type: TypeFonction, points: PointFeature<T>[], D: (a: T, b: T) => number, wMatrix?: number[][]): (p: T) => number {
+
+    if (type === "SIN") {
+        return creerFunctionSinus(points, D, wMatrix)
     }
-    if (type ==="DP") {
-        return creerFunctionDP(points,D)
+    if (type === "DP") {
+        return creerFunctionDP(points, D, wMatrix)
     }
-    return creerFunctionRDP(points,D)
+    return creerFunctionRDP(points, D, wMatrix)
 
 }
 /** === 1) Schéma SIN (ton schéma d'origine) — inchangé ==================== */
-export function creerFunctionSinus<T>(points: PointFeature<T>[],D:(a:T, b: T)=>number): (p:T) => number {
+export function creerFunctionSinus<T>(points: PointFeature<T>[], D: (a: T, b: T) => number, wMatrix?: number[][]): (p: T) => number {
     const m: number[][] = [];
 
     for (let i = 0; i < points.length; i++) {
@@ -45,8 +51,8 @@ export function creerFunctionSinus<T>(points: PointFeature<T>[],D:(a:T, b: T)=>n
         }
     }
 
-    return (p:T): number => {
-     
+    return (p: T): number => {
+
         let result = 0;
         let s = 0;
 
@@ -55,11 +61,12 @@ export function creerFunctionSinus<T>(points: PointFeature<T>[],D:(a:T, b: T)=>n
             for (let j = 0; j < points.length; j++) {
                 if (i != j) {
                     let d = D(p, points[j].value);
-                    o = o * Math.sin(Math.PI * (d / (d + m[i][j])));
+                    let n = wMatrix ? (wMatrix[j]?.[i] ?? 1) : 1;
+                    o = o * Math.pow(Math.sin(Math.PI * (d / (d + m[i][j]))), n);;
                 }
             }
 
-            const W = o;
+            const W = o
             const yi = points[i].y;
             s += W;
 
@@ -73,8 +80,8 @@ export function creerFunctionSinus<T>(points: PointFeature<T>[],D:(a:T, b: T)=>n
 /** === 2) Schéma DP : φ_i(p) = ∏_{j≠i} r_j(p) ==============================
  *  Invariance similitude, interpolation exacte, combinaison convexe.
  */
-export function creerFunctionDP<T>(points: PointFeature<T>[],D:(a:T, b: T)=>number): (p:T) => number {
-    return (p:T): number => {
+export function creerFunctionDP<T>(points: PointFeature<T>[], D: (a: T, b: T) => number, wMatrix?: number[][]): (p: T) => number {
+    return (p: T): number => {
 
         let result = 0;
         let s = 0;
@@ -89,10 +96,11 @@ export function creerFunctionDP<T>(points: PointFeature<T>[],D:(a:T, b: T)=>numb
             let o = 1;
             for (let j = 0; j < points.length; j++) {
                 if (i !== j) {
-                    o = o * r[j];              // φ_i = ∏_{j≠i} r_j(p)
+                    let n = wMatrix ? (wMatrix[j]?.[i] ?? 1) : 1;
+                    o = o * Math.pow(r[j], n);              // φ_i = ∏_{j≠i} r_j(p)^n
                 }
             }
-            const W = o;
+            const W = o
             const yi = points[i].y;
             s += W;
             result += W * yi;
@@ -105,8 +113,8 @@ export function creerFunctionDP<T>(points: PointFeature<T>[],D:(a:T, b: T)=>numb
 /** === 3) Schéma RDP : φ_i(p) = ∏_{j≠i} r_j(p) / (r_i(p) + r_j(p)) ==========
  *  Invariance similitude, interpolation exacte, combinaison convexe.
  */
-export function creerFunctionRDP<T>(points: PointFeature<T>[],D:(a: T, b: T)=>number): (p:T) => number {
-    return (p:T): number => {
+export function creerFunctionRDP<T>(points: PointFeature<T>[], D: (a: T, b: T) => number, wMatrix?: number[][]): (p: T) => number {
+    return (p: T): number => {
 
         let result = 0;
         let s = 0;
@@ -123,10 +131,11 @@ export function creerFunctionRDP<T>(points: PointFeature<T>[],D:(a: T, b: T)=>nu
             for (let j = 0; j < points.length; j++) {
                 if (i !== j) {
                     const rj = r[j];
-                    o = o * (rj / (ri + rj));  // φ_i = ∏_{j≠i} rj/(ri+rj)
+                    let n = wMatrix ? (wMatrix[j]?.[i] ?? 1) : 1;
+                    o = o * Math.pow(rj / (ri + rj), n);  // φ_i = ∏_{j≠i} (rj/(ri+rj))^n
                 }
             }
-            const W = o;
+            const W = o
             const yi = points[i].y;
             s += W;
             result += W * yi;

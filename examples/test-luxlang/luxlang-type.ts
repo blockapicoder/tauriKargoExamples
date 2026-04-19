@@ -1,37 +1,57 @@
-import { Arg } from "./luxlang-model"
+import { Arg, Fun, Prog } from "./luxlang-model"
 export interface Contexte {
     globals: Type[], locals: Type[]
 }
-export interface TypeAtom {
-    type: 'typeAtom'
-    name: string
+
+
+export interface TypeFun {
+    type:'fun'
+    code:Fun
+}
+export interface TypePartialCall {
+    type:'partialCall'
+    f: TypeFun | TypePartialCall
+    args:Type []
 }
 export interface TypeGen {
     type: 'typeGen'
     name: string
     args: Type[]
 }
-export interface TypeFunc {
-    type: 'typeFunc'
-    ret: Type
-    args: Type[]
+export interface TypeAny {
+    type:'any'
 }
+export interface TypeNull {
+    type:'null'
+}
+
 export interface TypeConst {
     type: 'typeConst'
-    value: any
+    value: number|string|boolean
 }
 export interface TypeUnion {
     type: 'typeUnion'
     args: Type[]
 }
+export  interface TypeMeta {
+    type:'typeMeta'
+    value:TypeBase
+}
 
-export interface TypeInferer {
-    type: 'typeInferer'
-    f: (ctx: Contexte, args: Arg[]) => Type
+export type TypeBase =  TypeGen  | TypeConst | TypeUnion | TypePartialCall | TypeFun | TypeAny | TypeNull
+export type Type = TypeBase | TypeMeta
+export interface TypeError {
+    type:'error'
 }
-export interface TypeTest {
-    type: 'typeTest'
-    then: (ctx: Contexte, args: Arg[]) => boolean
-    else: (ctx: Contexte, args: Arg[]) => boolean
+
+abstract class TypeChecker {
+    prog:Prog
+  
+    constructor( prog:Prog) {
+        this.prog = prog
+    }
+    computeReturnTypeFun(globals:Type[], f:TypeFun , args:Type []):Type|TypeError {
+        return  { type:'error'}
+    }
+    abstract computeReturnTypeGen( f:TypeGen , args:Type []):Type|TypeError
 }
-export type Type = TypeAtom | TypeGen | TypeFunc | TypeConst | TypeUnion | TypeInferer | TypeTest
