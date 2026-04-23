@@ -5,15 +5,10 @@ export type TypeFonction = "DP" | "RDP" | "SIN"
 // Types (compatibles)
 export interface PointFeature<T> {
     value: T;
-    w?: number[],
+  
     y: number;
 }
-function w<T>(p: PointFeature<T>, i: number) {
-    if (p.w) {
-        return p.w[i] ?? 1
-    }
-    return 1
-}
+
 // Distance euclidienne au carré dans R^2
 export function distance(a: THREE.Vector2, b: THREE.Vector2): number {
     let d = a.distanceToSquared(b);
@@ -62,7 +57,7 @@ export function creerFunctionSinus<T>(points: PointFeature<T>[], D: (a: T, b: T)
                 if (i != j) {
                     let d = D(p, points[j].value);
                     let n = wMatrix ? (wMatrix[j]?.[i] ?? 1) : 1;
-                    o = o * Math.pow(Math.sin(Math.PI * (d / (d + m[i][j]))), n);;
+                    o = o *Math.sin(Math.PI * (d**n/ (d**n + m[i][j]**n)));
                 }
             }
 
@@ -132,7 +127,7 @@ export function creerFunctionRDP<T>(points: PointFeature<T>[], D: (a: T, b: T) =
                 if (i !== j) {
                     const rj = r[j];
                     let n = wMatrix ? (wMatrix[j]?.[i] ?? 1) : 1;
-                    o = o * Math.pow(rj / (ri + rj), n);  // φ_i = ∏_{j≠i} (rj/(ri+rj))^n
+                    o = o *rj**n / (ri**n + rj**n);  // φ_i = ∏_{j≠i} (rj/(ri+rj))^n
                 }
             }
             const W = o

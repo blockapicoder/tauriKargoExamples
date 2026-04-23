@@ -46,26 +46,47 @@ export type Type = TypeBase | TypeMeta
 export interface TypeError {
     type: 'error'
 }
+export function listTypeUnion(type: Type): Type[] {
+
+    const r: Type[] = []
+    if (type.type === "typeUnion") {
+        for (const t of type.args) {
+
+            r.push(...listTypeUnion(t))
+
+        }
+    } else {
+        r.push(type)
+    }
+    return r
+
+}
 
 export abstract class TypeChecker {
     prog: Prog
+    currentFun: Set<Fun> = new Set()
 
     constructor(prog: Prog) {
         this.prog = prog
     }
-    computeType( args: Type[]): Type | TypeError {
-        const globals:Type [] = this.prog.map( (f)=> {
-            return  { type:"fun" , code:f}
+    computeType(args: Type[]): Type | TypeError {
+        const globals: Type[] = this.prog.map((f) => {
+            return { type: "fun", code: f }
         })
-        return this.computeReturnTypeFun(globals,this.prog[this.prog.length-1],args)
+        return this.computeReturnTypeFun(globals, this.prog[this.prog.length - 1], args)
 
     }
     computeReturnTypeFun(globals: Type[], f: Fun, args: Type[]): Type | TypeError {
         if (f.numArg !== args.length) {
             return { type: 'error' }
         }
-        return this.computeReturnTypeFunRec({ globals: globals, locals: [...args] }, f, 0)
-
+        if (this.currentFun.has(f)) {
+            return { type: "typeUnion", args: [] }
+        }
+        this.currentFun.add(f)
+        const r = this.computeReturnTypeFunRec({ globals: globals, locals: [...args] }, f, 0)
+        this.currentFun.delete(f)
+        return r
     }
     computeReturnTypeFunRec(context: TypeContexte, f: Fun, i: number): Type | TypeError {
 
@@ -80,7 +101,7 @@ export abstract class TypeChecker {
             }
             if (tmpType.type === "typeUnion") {
                 const rs: TypeUnion = { type: "typeUnion", args: [] }
-                for (const t of tmpType.args) {
+                for (const t of listTypeUnion(tmpType)) {
                     const newContext: TypeContexte = { globals: [...context.globals], locals: [...context.locals] }
                     if (tmpI.type === "setGlobal") {
                         newContext.globals[tmpI.var] = t
@@ -91,7 +112,7 @@ export abstract class TypeChecker {
                     if (tmpTypeBis.type === "error") {
                         return tmpTypeBis
                     }
-                    rs.args.push(tmpTypeBis)
+                    rs.args.push(...listTypeUnion(tmpTypeBis))
 
                 }
                 return rs;
@@ -122,7 +143,7 @@ export abstract class TypeChecker {
                 if (retType.type === "error") {
                     return retType
                 }
-                return { type: "typeUnion", args: [thenType, retType] }
+                return { type: "typeUnion", args: [...listTypeUnion(thenType), ...listTypeUnion(retType)] }
             }
             if (tmpType.type === "null") {
                 return this.computeReturnTypeFunRec(context, f, i + 1)
@@ -147,7 +168,7 @@ export abstract class TypeChecker {
             return context.locals[a.idx] ?? { type: "error" }
         }
         if (a.type === "literal")
-            return { type: "typeConst", value: typeof a.value }
+            return { type: "typeConst", value: a.value }
         return { type: "error" }
     }
     getTypeForCell(context: TypeContexte, cell: Cell): Type | TypeError {
@@ -170,11 +191,11 @@ export abstract class TypeChecker {
         }
         if (typeof expr.op === "string") {
 
-            return this.computeReturnRefCall(expr.op, args);
+            return this.computeReturnRefCall(context, expr.op, args);
         }
         const tmpType = this.getTypeForCell(context, expr.op)
         if (tmpType.type === "typeGen") {
-            return this.computeReturnTypeGen(tmpType, args)
+            return this.computeReturnTypeGen(context, tmpType, args)
         }
         if (tmpType.type === "fun") {
             return this.computeReturnTypeFun(context.globals, tmpType.code, args)
@@ -228,6 +249,6 @@ export abstract class TypeChecker {
 
         return { type: 'error' }
     }
-    abstract computeReturnTypeGen(f: TypeGen, args: Type[]): Type | TypeError
-    abstract computeReturnRefCall(ref: string, args: Type[]): Type | TypeError
+    abstract computeReturnTypeGen(context: TypeContexte, f: TypeGen, args: Type[]): Type | TypeError
+    abstract computeReturnRefCall(context: TypeContexte, ref: string, args: Type[]): Type | TypeError
 }
