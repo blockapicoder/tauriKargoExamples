@@ -1,0 +1,11 @@
+fun f(x);
+if x > 0 then {
+ set m=2*x;
+ call print(m*10);
+  ret m;
+}
+ret x;
+
+fun main();
+call clear();
+ret f(10);

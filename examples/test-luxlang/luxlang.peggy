@@ -29,9 +29,22 @@ ParamList
 Instr
   = SetLocalStmt
   / SetGlobalInFunStmt
+  / IfThenBlockStmt
   / IfRetStmt
   / ICallExpr
-
+IfThenBlockStmt
+  = "if" __ cond:Expr __ "then" _ "{" _
+      code:Instr*
+      ret:ReturnStmt
+    _ "}" _
+    {
+      return {
+        kind: "ifBlock",
+        if: cond,
+        code,
+        ret
+      };
+    }
 SetLocalStmt
   = "set" __ name:Ident _ "=" _ value:Expr _ ";" _
     { return { kind:"setLocal", name, value }; }

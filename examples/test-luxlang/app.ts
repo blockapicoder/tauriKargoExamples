@@ -15,7 +15,7 @@ cm.CodeMirror.defineSimpleMode("luxlang", {
     start: [
         { regex: /"(?:[^\\]|\\.)*?"/, token: "string" },
         {
-            regex: /\b(setGlobal|set|ret|call|fun|if)\b/,
+            regex: /\b(setGlobal|set|ret|call|fun|if|then)\b/,
             token: "keyword-special",
         },
         {
@@ -41,13 +41,13 @@ class DialogCreerScript {
     peutCreer = false
 
     verifier() {
-        this.peutCreer = this.editor.scriptNames.every((n) => n != this.nom.trim().toLocaleLowerCase())
+        this.peutCreer = this.editor.scriptNames.every((n) => n != this.nom.trim().toLocaleLowerCase()) && this.nom.trim().endsWith(".lux")
 
     }
 
 
     async creer() {
-
+        this.editor.scriptNames = [...this.editor.scriptNames, this.nom]
         this.editor.dialogCreerScript = undefined
     }
     annuler() {
@@ -104,8 +104,8 @@ class Editor {
 
             },
             createArray: (...args: any[]) => args,
-            "[]":(...args: any[]) => args,
-            "->":( head:any ,  tail: any[]) => [head,...tail],
+            "[]": (...args: any[]) => args,
+            "->": (head: any, tail: any[]) => [head, ...tail],
             map: (lst: any[], f: (o: any) => any) => lst.map(f),
             filter: (lst: any[], f: (o: any) => boolean) => lst.filter(f),
             concat: (...args: any[][]) => args.flatMap((e) => e),
@@ -135,10 +135,16 @@ class Editor {
         this.dialogCreerScript.editor = this
 
     }
-    removeScript() {
+    async saveScript() {
+
+        const config = await client.getConfig()
+        await client.setCurrentDirectory({ path: `${config.code}/examples` })
+        await client.writeFileText(this.scriptNames[this.selections[0]],this.codemirror.getValue())
+
+
 
     }
-    
+
     async run() {
 
         try {
@@ -244,7 +250,7 @@ defineVue(Editor, (vue) => {
                 orientation: "row", gap: 5
             }, () => {
                 vue.staticButton({ action: "run", label: "Run", enable: "estExecutable" })
-                vue.staticButton({ action: "removeScript", label: "Remove script" })
+                vue.staticButton({ action: "saveScript", label: "Save script", enable: "estExecutable" })
                 vue.menu({ name: "dialogCreerScript", action: "addScript", label: "Add script" })
 
             })
