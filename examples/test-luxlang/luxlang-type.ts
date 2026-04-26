@@ -43,6 +43,19 @@ export interface TypeMeta {
 
 export type TypeBase = TypeGen | TypeRef | TypeConst | TypeUnion | TypePartialCall | TypeFun | TypeAny | TypePrimitif
 export type Type = TypeBase | TypeMeta
+
+type Model = {
+    primitiveType(op: string, args: Type[]): Type | Error
+    genericType(name: string, args: Type[]): Type | Error
+}
+
+type typecheck = (
+    prog: Prog,
+    inputTypes: Type[],
+    model: Model
+) => Type | Error
+
+
 export interface FunSignature {
     idx: number
     values: Map<string, TypeUnion>
@@ -86,11 +99,11 @@ export abstract class TypeChecker {
     constructor(prog: Prog) {
         this.prog = prog
     }
-    toBooleanValue( type:TypeConst):boolean {
-        if (typeof type.value ==="boolean") {
+    toBooleanValue(type: TypeConst): boolean {
+        if (typeof type.value === "boolean") {
             return type.value
         }
-        if (typeof type.value ==="string") {
+        if (typeof type.value === "string") {
             return type.value !== ""
         }
         return type.value !== 0
